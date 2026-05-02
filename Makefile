@@ -30,7 +30,7 @@ tail-watch: ## Rebuild CSS on changes when tailwindcss is available
 
 tail-prod: ## Build CSS for production, or copy source CSS if Tailwind is unavailable
 	@if command -v tailwindcss >/dev/null 2>&1; then \
-		tailwindcss -i ./tailwind/styles.css -o ./static/styles.css --minify; \
+		tailwindcss -i ./tailwind/styles.css -o ./static/styles.css; \
 	else \
 		cp ./tailwind/styles.css ./static/styles.css; \
 	fi
