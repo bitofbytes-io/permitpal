@@ -106,7 +106,7 @@ func EstimateReadyDate(profile Profile, now time.Time) string {
 	if !readyDate.After(today) {
 		return "Ready when checklist is mastered"
 	}
-	return "On pace for " + readyDate.Format("January 2")
+	return "On pace for " + readyDate.Format("January 2, 2006")
 }
 
 func FormatHours(hours float64) string {

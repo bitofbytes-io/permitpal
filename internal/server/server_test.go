@@ -46,6 +46,11 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 	if !strings.Contains(body, "Skill Mastery Checklist") || !strings.Contains(body, "Lane changes") {
 		t.Fatalf("dashboard missing checklist content: %s", body)
 	}
+	if !strings.Contains(body, `id="total_hours" name="total_hours" type="text" inputmode="decimal"`) ||
+		!strings.Contains(body, `id="night_hours" name="night_hours" type="text" inputmode="decimal"`) ||
+		strings.Contains(body, `oninput="this.value`) {
+		t.Fatalf("dashboard did not render decimal-friendly hour inputs: %s", body)
+	}
 
 	update := url.Values{
 		"status":        {"mastered"},

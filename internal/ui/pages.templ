@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/drywaters/permitpal/internal/model"
 )
@@ -70,12 +71,12 @@ templ DashboardPage(dashboard model.Dashboard) {
 								<form class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML">
 									<label for="total_hours">Total hours (current)</label>
 									<div class="inline-unit">
-										<input id="total_hours" name="total_hours" type="number" step="0.1" min="0" max="60" value={ model.FormatHours(dashboard.Profile.TotalHours) } oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d).+/g, '$1')"/>
+										<input id="total_hours" name="total_hours" type="text" inputmode="decimal" pattern="([0-9]+(\.[0-9]?)?|\.[0-9])" autocomplete="off" value={ model.FormatHours(dashboard.Profile.TotalHours) }/>
 										<span>/ 60</span>
 									</div>
 									<label for="night_hours">Night hours (current)</label>
 									<div class="inline-unit">
-										<input id="night_hours" name="night_hours" type="number" step="0.1" min="0" max="10" value={ model.FormatHours(dashboard.Profile.NightHours) } oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d).+/g, '$1')"/>
+										<input id="night_hours" name="night_hours" type="text" inputmode="decimal" pattern="([0-9]+(\.[0-9]?)?|\.[0-9])" autocomplete="off" value={ model.FormatHours(dashboard.Profile.NightHours) }/>
 										<span>/ 10</span>
 									</div>
 									<label for="permit_issue_date">Permit issue date</label>
@@ -182,7 +183,12 @@ templ ProgressPanel(dashboard model.Dashboard) {
 			<h2>Ready estimate</h2>
 			<div class="estimate-face">
 				<div class="calendar-icon" aria-hidden="true"></div>
-				<strong>{ dashboard.ReadyEstimate }</strong>
+				if estimatePrefix, estimateDate, ok := strings.Cut(dashboard.ReadyEstimate, " for "); ok {
+					<span>{ estimatePrefix } for</span>
+					<strong>{ estimateDate }</strong>
+				} else {
+					<strong>{ dashboard.ReadyEstimate }</strong>
+				}
 			</div>
 		</div>
 	</section>
