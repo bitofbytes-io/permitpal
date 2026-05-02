@@ -509,46 +509,36 @@ input {
 
 .practice-heading {
   display: grid;
-  grid-template-columns: 46px 1fr;
-  gap: 10px;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
   align-items: center;
 }
 
 .traffic-cone-icon {
-  width: 34px;
-  height: 46px;
+  width: 44px;
+  height: 56px;
   display: block;
   justify-self: center;
   position: relative;
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.35));
+  background: url("/static/assets/permitpal-traffic-cone.png") center / contain no-repeat;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.22));
 }
 
 .traffic-cone-icon::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  top: 0;
-  bottom: 0;
-  clip-path: polygon(50% 0, 100% 100%, 0 100%);
-  background:
-    linear-gradient(180deg, transparent 27%, #fff8e6 27% 42%, transparent 42% 64%, #fff8e6 64% 80%, transparent 80%),
-    linear-gradient(90deg, #d94f00, #ff7b10 45%, #d94f00);
-  border: 2px solid #141817;
-  border-bottom: 0;
+  content: none;
 }
 
 .traffic-cone-icon::after {
-  display: none;
+  content: none;
 }
 
 .practice-heading h2 {
   margin: 0;
   font-family: "Patrick Hand", cursive;
   font-size: 1.72rem;
+  line-height: 1;
 }
 
-.practice-heading p,
 .practice-note {
   margin: 2px 0 0;
   color: #343a36;
@@ -556,7 +546,7 @@ input {
 }
 
 .practice-panel ol {
-  margin: 14px 0 12px;
+  margin: 16px 0 12px;
   padding: 0;
   list-style: none;
   counter-reset: focus;
@@ -578,11 +568,13 @@ input {
   content: "";
   position: absolute;
   left: 5px;
+  top: 50%;
   width: 29px;
   height: 29px;
   display: grid;
   place-items: center;
-  transform: rotate(45deg);
+  transform: translateY(-50%) rotate(45deg);
+  transform-origin: center;
   border: 2px solid #111;
   border-radius: 4px;
   background: var(--line);
@@ -592,12 +584,21 @@ input {
   content: counter(focus);
   position: absolute;
   left: 5px;
+  top: 50%;
   width: 29px;
   height: 29px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(3px, -50%);
   color: #111;
   font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.practice-panel li:first-child::after {
+  transform: translate(2px, -50%);
 }
 
 .clipboard-shell {
@@ -894,28 +895,27 @@ input {
 
   .practice-panel {
     display: grid;
-    grid-template-rows: auto 1fr auto;
-    align-content: stretch;
+    grid-template-rows: auto auto auto;
+    align-content: start;
     padding: 28px 36px;
   }
 
   .practice-heading {
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 72px minmax(0, 1fr);
     gap: 18px;
     width: min(540px, 100%);
     margin: 0 auto;
   }
 
   .traffic-cone-icon {
-    width: 44px;
-    height: 60px;
+    width: 52px;
+    height: 68px;
   }
 
   .practice-heading h2 {
     font-size: 2.15rem;
   }
 
-  .practice-heading p,
   .practice-note {
     font-size: 1rem;
   }
@@ -925,7 +925,7 @@ input {
     align-content: center;
     gap: clamp(18px, 3.2vw, 30px);
     width: min(540px, 100%);
-    margin: 18px auto;
+    margin: 20px auto 18px;
   }
 
   .practice-panel li {
@@ -988,27 +988,26 @@ input {
   }
 
   .practice-heading {
-    grid-template-columns: 50px minmax(0, 1fr);
+    grid-template-columns: 54px minmax(0, 1fr);
     gap: 12px;
   }
 
   .traffic-cone-icon {
-    width: 34px;
-    height: 46px;
+    width: 42px;
+    height: 54px;
   }
 
   .practice-heading h2 {
     font-size: 1.8rem;
   }
 
-  .practice-heading p,
   .practice-note {
     font-size: 0.9rem;
   }
 
   .practice-panel ol {
     gap: 14px;
-    margin: 16px auto;
+    margin: 18px auto 16px;
   }
 
   .practice-panel li {
