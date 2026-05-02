@@ -46,11 +46,8 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 	if !strings.Contains(body, "Skill Mastery Checklist") || !strings.Contains(body, "Lane changes") {
 		t.Fatalf("dashboard missing checklist content: %s", body)
 	}
-	if !strings.Contains(body, `id="total_hours" name="total_hours" type="text" inputmode="decimal"`) ||
-		!strings.Contains(body, `id="night_hours" name="night_hours" type="text" inputmode="decimal"`) ||
-		strings.Contains(body, `oninput="this.value`) {
-		t.Fatalf("dashboard did not render decimal-friendly hour inputs: %s", body)
-	}
+	assertDecimalHourInput(t, body, "total_hours")
+	assertDecimalHourInput(t, body, "night_hours")
 
 	update := url.Values{
 		"status":        {"mastered"},
@@ -134,4 +131,37 @@ func closeBody(t *testing.T, res *http.Response) {
 	if err := res.Body.Close(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func assertDecimalHourInput(t *testing.T, body, id string) {
+	t.Helper()
+	tag := inputTagByID(t, body, id)
+	required := []string{
+		`name="` + id + `"`,
+		`type="text"`,
+		`inputmode="decimal"`,
+	}
+	for _, attr := range required {
+		if !strings.Contains(tag, attr) {
+			t.Fatalf("%s input missing %s: %s", id, attr, tag)
+		}
+	}
+	if strings.Contains(tag, `oninput="this.value`) {
+		t.Fatalf("%s input still mutates value on input: %s", id, tag)
+	}
+}
+
+func inputTagByID(t *testing.T, body, id string) string {
+	t.Helper()
+	idAttr := `id="` + id + `"`
+	idIndex := strings.Index(body, idAttr)
+	if idIndex < 0 {
+		t.Fatalf("input %s not found in body: %s", id, body)
+	}
+	start := strings.LastIndex(body[:idIndex], "<input")
+	end := strings.Index(body[idIndex:], ">")
+	if start < 0 || end < 0 {
+		t.Fatalf("input %s tag could not be extracted from body: %s", id, body)
+	}
+	return body[start : idIndex+end+1]
 }
