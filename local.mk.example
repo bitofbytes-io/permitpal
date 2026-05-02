@@ -1,0 +1,11 @@
+# Local development defaults.
+# Copy to local.mk if you want overrides. Do not commit local.mk.
+
+PORT := 4600
+APP_ENV := development
+DATA_STORE := memory
+PERMITPAL_PASSWORD := permitpal
+
+# Used by make run-postgres and migration targets.
+# The Makefile URL-encodes reserved username/password characters for goose.
+DATABASE_URL := postgres://permitpal:permitpal@localhost:5432/permitpal?sslmode=disable
