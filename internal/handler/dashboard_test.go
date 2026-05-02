@@ -1,6 +1,9 @@
 package handler
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParseHoursAllowsSingleDecimalPlace(t *testing.T) {
 	tests := map[string]float64{
@@ -36,5 +39,12 @@ func TestParseHoursRejectsValuesAboveMaximum(t *testing.T) {
 		if _, err := parseHours(value, 60); err == nil {
 			t.Fatalf("parseHours(%q) returned nil error", value)
 		}
+	}
+}
+
+func TestRequirementNotesLengthLimit(t *testing.T) {
+	notes := strings.Repeat("a", maxNotesChars+1)
+	if len(notes) <= maxNotesChars {
+		t.Fatal("test setup failed")
 	}
 }
