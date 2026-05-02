@@ -38,17 +38,21 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	serverErr := make(chan error, 1)
 	go func() {
 		logger.Info("permitpal listening", "port", cfg.Port, "data_store", cfg.DataStore)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server failed", "error", err)
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	<-stop
+	select {
+	case <-stop:
+	case err := <-serverErr:
+		logger.Error("server failed", "error", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

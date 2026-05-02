@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -19,11 +20,7 @@ func TestUnauthenticatedUserSeesLogin(t *testing.T) {
 	ts := newTestServer(t)
 	defer ts.Close()
 
-	res, err := http.Get(ts.URL + "/login")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
+	res := doGet(t, http.DefaultClient, ts.URL+"/login")
 	body := readBody(t, res)
 	if !strings.Contains(body, "PermitPal") || !strings.Contains(body, "Sign in") {
 		t.Fatalf("login page did not render expected copy: %s", body)
@@ -41,16 +38,10 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 	}
 	client.Jar = jar
 	loginForm := url.Values{"password": {"test-password"}}
-	res, err := client.PostForm(ts.URL+"/login", loginForm)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = res.Body.Close()
+	res := doPostForm(t, client, ts.URL+"/login", loginForm)
+	closeBody(t, res)
 
-	res, err = client.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatal(err)
-	}
+	res = doGet(t, client, ts.URL+"/")
 	body := readBody(t, res)
 	if !strings.Contains(body, "Skill Mastery Checklist") || !strings.Contains(body, "Lane changes") {
 		t.Fatalf("dashboard missing checklist content: %s", body)
@@ -61,10 +52,7 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 		"mastered_date": {"2026-05-02"},
 		"notes":         {"Clean mirror checks."},
 	}
-	res, err = client.PostForm(ts.URL+"/requirements/lane-changes", update)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res = doPostForm(t, client, ts.URL+"/requirements/lane-changes", update)
 	row := readBody(t, res)
 	if !strings.Contains(row, "Mastered") || !strings.Contains(row, "Clean mirror checks.") {
 		t.Fatalf("requirement partial missing updated content: %s", row)
@@ -76,10 +64,7 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 		"permit_issue_date":  {"2025-10-18"},
 		"unexpected_ignored": {"x"},
 	}
-	res, err = client.PostForm(ts.URL+"/profile", progress)
-	if err != nil {
-		t.Fatal(err)
-	}
+	res = doPostForm(t, client, ts.URL+"/profile", progress)
 	panel := readBody(t, res)
 	if !strings.Contains(panel, "42.5 total hours") || !strings.Contains(panel, "8.5 night hours") {
 		t.Fatalf("progress partial missing updated values: %s", panel)
@@ -102,12 +87,46 @@ func newTestServer(t *testing.T) *httptest.Server {
 	return httptest.NewServer(app.Router())
 }
 
+func doGet(t *testing.T, client *http.Client, url string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func doPostForm(t *testing.T, client *http.Client, target string, form url.Values) *http.Response {
+	t.Helper()
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, target, strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
 func readBody(t *testing.T, res *http.Response) string {
 	t.Helper()
-	defer res.Body.Close()
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
+	closeBody(t, res)
 	return string(data)
+}
+
+func closeBody(t *testing.T, res *http.Response) {
+	t.Helper()
+	if err := res.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -13,6 +13,11 @@ func RequireAuth(manager *auth.Manager) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
+			if r.Header.Get("HX-Request") == "true" {
+				w.Header().Set("HX-Redirect", "/login")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 		})
 	}
