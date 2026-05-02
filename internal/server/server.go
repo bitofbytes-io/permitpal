@@ -28,6 +28,8 @@ func (s *Server) Router() http.Handler {
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
 	r.Use(chimw.Recoverer)
+	r.Use(middleware.RequireSameOrigin)
+	r.Use(middleware.LimitBodyBytes(16 * 1024))
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
