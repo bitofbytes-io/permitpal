@@ -109,6 +109,11 @@ func doPostForm(t *testing.T, client *http.Client, target string, form url.Value
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	u, err := url.Parse(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Origin", u.Scheme+"://"+u.Host)
 	res, err := client.Do(req)
 	if err != nil {
 		t.Fatal(err)

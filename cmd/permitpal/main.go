@@ -23,6 +23,12 @@ func main() {
 		logger.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
+	if cfg.AppEnv == "development" && cfg.PasswordHash == "" && cfg.Password == "permitpal" {
+		logger.Warn("using development fallback password; do not expose this environment", "app_env", cfg.AppEnv)
+	}
+	if cfg.AppEnv == "development" && cfg.SessionSecret == "permitpal-local-dev-session-secret-change-me" {
+		logger.Warn("using development fallback session secret; do not expose this environment", "app_env", cfg.AppEnv)
+	}
 
 	store, closeStore, err := repository.NewStore(context.Background(), cfg)
 	if err != nil {

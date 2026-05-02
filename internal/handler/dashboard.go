@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/drywaters/permitpal/internal/model"
 	"github.com/drywaters/permitpal/internal/repository"
@@ -17,6 +18,7 @@ import (
 const (
 	maxTotalHours = 60
 	maxNightHours = 10
+	maxNotesChars = 1000
 )
 
 type DashboardHandler struct {
@@ -99,6 +101,10 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 	existing.Status = status
 	existing.MasteredDate = model.NormalizeDate(r.FormValue("mastered_date"))
 	existing.Notes = strings.TrimSpace(r.FormValue("notes"))
+	if utf8.RuneCountInString(existing.Notes) > maxNotesChars {
+		http.Error(w, fmt.Sprintf("Notes must be %d characters or fewer", maxNotesChars), http.StatusBadRequest)
+		return
+	}
 	if existing.Status != model.StatusMastered {
 		existing.MasteredDate = nil
 	}
