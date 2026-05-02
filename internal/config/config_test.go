@@ -1,7 +1,6 @@
 package config
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -13,13 +12,12 @@ func clearAuthEnv(t *testing.T) {
 		"PERMITPAL_PASSWORD_HASH", "PERMITPAL_PASSWORD_HASH_FILE",
 		"SESSION_SECRET", "SESSION_SECRET_FILE",
 	} {
-		if err := os.Unsetenv(key); err != nil {
-			t.Fatalf("Unsetenv(%s): %v", key, err)
-		}
+		t.Setenv(key, "")
 	}
 }
 
 func TestLoadParsesSecureCookiesCaseInsensitively(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
 	t.Setenv("SECURE_COOKIES", "FALSE")
 	t.Setenv("PERMITPAL_PASSWORD_HASH", "local-password-hash")
 	t.Setenv("SESSION_SECRET", "local-session-secret")

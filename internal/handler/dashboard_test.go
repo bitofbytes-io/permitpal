@@ -51,6 +51,29 @@ func TestParseHoursRejectsValuesAboveMaximum(t *testing.T) {
 
 func TestRequirementNotesLengthLimit(t *testing.T) {
 	notes := strings.Repeat("a", maxNotesChars+1)
+	rec := updateRequirementWithNotes(t, notes)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	want := "Notes must be 1000 characters or fewer"
+	if !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("body = %q, want %q", rec.Body.String(), want)
+	}
+}
+
+func TestRequirementNotesLengthLimitCountsRunes(t *testing.T) {
+	notes := strings.Repeat("é", maxNotesChars)
+
+	rec := updateRequirementWithNotes(t, notes)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+}
+
+func updateRequirementWithNotes(t *testing.T, notes string) *httptest.ResponseRecorder {
+	t.Helper()
 	form := url.Values{
 		"status": {"needs_practice"},
 		"notes":  {notes},
@@ -64,11 +87,5 @@ func TestRequirementNotesLengthLimit(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
-	}
-	want := "Notes must be 1000 characters or fewer"
-	if !strings.Contains(rec.Body.String(), want) {
-		t.Fatalf("body = %q, want %q", rec.Body.String(), want)
-	}
+	return rec
 }

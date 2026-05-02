@@ -50,6 +50,28 @@ func TestRequireSameOriginRejectsPortMismatch(t *testing.T) {
 	}
 }
 
+func TestRequireSameOriginRejectsHostMismatch(t *testing.T) {
+	called := false
+	handler := RequireSameOrigin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequest(http.MethodPost, "https://permitpal.example/requirements/backing", nil)
+	req.Host = "permitpal.example"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.Header.Set("Origin", "https://attacker.example")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if called {
+		t.Fatal("handler was called for cross-host request")
+	}
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
 func TestRequireSameOriginAcceptsMatchingForwardedSchemeHostAndPort(t *testing.T) {
 	handler := RequireSameOrigin(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)

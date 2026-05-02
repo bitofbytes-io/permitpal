@@ -5,6 +5,9 @@ PORT ?= 4600
 APP_ENV ?= development
 DATA_STORE ?= memory
 export DATABASE_URL
+export PERMITPAL_PASSWORD
+export PERMITPAL_PASSWORD_HASH
+export SESSION_SECRET
 
 NORMALIZE_DATABASE_URL = python3 -c 'import os, urllib.parse as u; url = os.environ.get("DATABASE_URL", ""); scheme, sep, rest = url.partition("://"); authority, at, tail = rest.rpartition("@"); valid = bool(sep and at and ":" in authority); user, password = authority.split(":", 1) if valid else ("", ""); user = u.quote(u.unquote(user), safe=""); password = u.quote(u.unquote(password), safe=""); print(scheme + "://" + user + ":" + password + "@" + tail if valid else url)'
 
@@ -36,7 +39,7 @@ tail-prod: ## Build CSS for production, or copy source CSS if Tailwind is unavai
 dev: templ tail-prod ## Run local visual preview with memory storage and no database
 	@test -n '$(PERMITPAL_PASSWORD)$(PERMITPAL_PASSWORD_HASH)' || (echo "PERMITPAL_PASSWORD or PERMITPAL_PASSWORD_HASH must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(SESSION_SECRET)' || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
-	APP_ENV=development DATA_STORE=memory PORT=$(PORT) PERMITPAL_PASSWORD='$(PERMITPAL_PASSWORD)' PERMITPAL_PASSWORD_HASH='$(PERMITPAL_PASSWORD_HASH)' SESSION_SECRET='$(SESSION_SECRET)' go run ./cmd/permitpal
+	APP_ENV=development DATA_STORE=memory PORT=$(PORT) go run ./cmd/permitpal
 
 run: dev ## Alias for local preview
 
@@ -44,7 +47,7 @@ run-postgres: templ tail-prod ## Run locally against Postgres
 	@test -n '$(PERMITPAL_PASSWORD)$(PERMITPAL_PASSWORD_HASH)' || (echo "PERMITPAL_PASSWORD or PERMITPAL_PASSWORD_HASH must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(SESSION_SECRET)' || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)
-	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$$($(NORMALIZE_DATABASE_URL))" PERMITPAL_PASSWORD='$(PERMITPAL_PASSWORD)' PERMITPAL_PASSWORD_HASH='$(PERMITPAL_PASSWORD_HASH)' SESSION_SECRET='$(SESSION_SECRET)' go run ./cmd/permitpal
+	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$$($(NORMALIZE_DATABASE_URL))" go run ./cmd/permitpal
 
 build: templ tail-prod ## Build the production binary
 	mkdir -p $(BIN_DIR)
