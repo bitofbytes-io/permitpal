@@ -15,8 +15,8 @@ func TestEstimateReadyDateUsesAveragePaceFromStartDate(t *testing.T) {
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)
 
 	got := EstimateReadyDate(profile, now)
-	if got != "On pace for November 25" {
-		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "On pace for November 25")
+	if got != "On pace for November 25, 2026" {
+		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "On pace for November 25, 2026")
 	}
 }
 
@@ -30,8 +30,8 @@ func TestEstimateReadyDateUsesPermitHoldWhenLater(t *testing.T) {
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)
 
 	got := EstimateReadyDate(profile, now)
-	if got != "On pace for October 15" {
-		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "On pace for October 15")
+	if got != "On pace for October 15, 2026" {
+		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "On pace for October 15, 2026")
 	}
 }
 
