@@ -1,0 +1,222 @@
+package ui
+
+import (
+	"fmt"
+
+	"github.com/drywaters/permitpal/internal/model"
+)
+
+templ LoginPage(errorMessage string) {
+	<!doctype html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>PermitPal</title>
+			<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
+			<link rel="stylesheet" href="/static/styles.css"/>
+		</head>
+		<body class="login-body">
+			<main class="login-shell">
+				<section class="login-panel" aria-label="Sign in">
+					<img class="road-sign-logo" src="/static/assets/permitpal-road-sign-logo.png" alt="PermitPal North Carolina"/>
+					<p class="tagline">Your permit pal—less yelling, more tracking.</p>
+					<form class="login-form" method="post" action="/login">
+						if errorMessage != "" {
+							<p class="form-error" role="alert">{ errorMessage }</p>
+						}
+						<label class="sr-only" for="username">Username</label>
+						<input id="username" class="sr-only" name="username" autocomplete="username" value="driver" tabindex="-1"/>
+						<label for="password">Password</label>
+						<input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" autofocus/>
+						<button type="submit">Sign in</button>
+					</form>
+				</section>
+			</main>
+		</body>
+	</html>
+}
+
+templ DashboardPage(dashboard model.Dashboard) {
+	<!doctype html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>PermitPal Dashboard</title>
+			<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
+			<link rel="stylesheet" href="/static/styles.css"/>
+			<script src="/static/htmx.min.js" defer></script>
+		</head>
+		<body>
+			<header class="dash-header">
+				<a class="dash-brand" href="/" aria-label="PermitPal home">
+					<span class="car-mark" aria-hidden="true"><span></span></span>
+					<strong>PermitPal</strong>
+				</a>
+				<div class="lane-divider" aria-hidden="true"></div>
+				<div class="welcome">Welcome back, Driver!</div>
+				<form method="post" action="/logout">
+					<button class="logout-button" type="submit">Logout</button>
+				</form>
+			</header>
+			<div class="app-shell">
+				<main>
+					@ProgressPanel(dashboard)
+					<div class="content-grid">
+						<aside class="dashboard-side" aria-label="Progress controls">
+							<section class="side-panel">
+								<h2>Update progress</h2>
+								<form class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML">
+									<label for="total_hours">Total hours (current)</label>
+									<div class="inline-unit">
+										<input id="total_hours" name="total_hours" type="number" step="0.1" min="0" max="60" value={ model.FormatHours(dashboard.Profile.TotalHours) } oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d).+/g, '$1')"/>
+										<span>/ 60</span>
+									</div>
+									<label for="night_hours">Night hours (current)</label>
+									<div class="inline-unit">
+										<input id="night_hours" name="night_hours" type="number" step="0.1" min="0" max="10" value={ model.FormatHours(dashboard.Profile.NightHours) } oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1').replace(/(\.\d).+/g, '$1')"/>
+										<span>/ 10</span>
+									</div>
+									<label for="permit_issue_date">Permit issue date</label>
+									<input id="permit_issue_date" name="permit_issue_date" type="date" value={ model.DateValue(dashboard.Profile.PermitIssueDate) }/>
+									<button type="submit">Save progress</button>
+								</form>
+							</section>
+							<section class="side-panel practice-panel">
+								<div class="practice-heading">
+									<span class="traffic-cone-icon" aria-hidden="true"></span>
+									<div>
+										<h2>Practice focus</h2>
+										<p>Next 3 to work on</p>
+									</div>
+								</div>
+								<ol>
+									for _, req := range dashboard.PracticeFocus {
+										<li>{ req.Title }</li>
+									}
+								</ol>
+								<p class="practice-note">Focus on these skills during your next few drives.</p>
+							</section>
+						</aside>
+						<section class="dashboard-main" aria-labelledby="checklist-heading">
+							<div class="clipboard-shell">
+								<div class="clipboard-clip" aria-hidden="true"></div>
+								<div class="sheet-title">
+									<h1 id="checklist-heading">Skill Mastery Checklist</h1>
+								</div>
+								<div class="checklist-table" aria-label="Driving skills">
+									<div class="checklist-head" role="row">
+										<span>#</span>
+										<span>Skill</span>
+										<span>Needs Practice</span>
+									<span>Mastered</span>
+									<span>Mastered Date</span>
+									<span>Practice Notes</span>
+									<span class="save-column"></span>
+									</div>
+									for _, req := range dashboard.Requirements {
+										@RequirementRow(req)
+									}
+								</div>
+								<div class="checklist-reference">
+									<span>Requirements from NCDMV for a Class C learner permit.</span>
+									<a href="https://www.ncdot.gov/dmv/license-id/driver-licenses/new-drivers/Pages/level2.aspx" target="_blank" rel="noopener noreferrer">Learn more</a>
+								</div>
+							</div>
+						</section>
+					</div>
+					<footer class="encouragement-banner">
+						<div class="road-dashes" aria-hidden="true"></div>
+						<span>Keep practicing</span>
+						<p>You’ve got this. Stay consistent!</p>
+						<div class="checkers" aria-hidden="true"></div>
+					</footer>
+				</main>
+			</div>
+		</body>
+	</html>
+}
+
+templ ProgressPanel(dashboard model.Dashboard) {
+	<section id="progress-panel" class="progress-panel" aria-label="Current progress">
+		<div class="metric odometer-metric">
+			<h2>Current hours</h2>
+			<div class="odometer-line">
+				<div class="odometer" aria-label={ model.FormatHours(dashboard.Profile.TotalHours) + " total hours" }>
+					for _, char := range odometerChars(dashboard.Profile.TotalHours) {
+						if char == "." {
+							<span class="odo-dot">.</span>
+						} else {
+							<span>{ char }</span>
+						}
+					}
+				</div>
+				<strong>/ 60</strong>
+			</div>
+			<div class="road-meter" style={ progressStyle(dashboard.TotalPercent) }>
+				<span class="road-fill"></span>
+				<span class="road-marker">{ model.FormatHours(dashboard.Profile.TotalHours) }</span>
+			</div>
+		</div>
+		<div class="metric odometer-metric">
+			<h2>Night hours</h2>
+			<div class="odometer-line">
+				<div class="odometer" aria-label={ model.FormatHours(dashboard.Profile.NightHours) + " night hours" }>
+					for _, char := range odometerChars(dashboard.Profile.NightHours) {
+						if char == "." {
+							<span class="odo-dot">.</span>
+						} else {
+							<span>{ char }</span>
+						}
+					}
+				</div>
+				<strong>/ 10</strong>
+			</div>
+			<div class="road-meter" style={ progressStyle(dashboard.NightPercent) }>
+				<span class="road-fill"></span>
+				<span class="road-marker">{ model.FormatHours(dashboard.Profile.NightHours) }</span>
+			</div>
+		</div>
+		<div class="estimate-sign">
+			<h2>Ready estimate</h2>
+			<div class="estimate-face">
+				<div class="calendar-icon" aria-hidden="true"></div>
+				<span>On pace for</span>
+				<strong>{ readyDateLabel(dashboard.ReadyEstimate) }</strong>
+			</div>
+		</div>
+	</section>
+}
+
+templ RequirementRow(req model.Requirement) {
+	<form
+		id={ "requirement-" + req.Key }
+		class={ "checklist-row " + requirementRowClass(req.Status) }
+		hx-post={ "/requirements/" + req.Key }
+		hx-target={ "#requirement-" + req.Key }
+		hx-swap="outerHTML"
+	>
+		<div class="row-number">{ fmt.Sprintf("%d", req.SortOrder) }</div>
+		<div class="skill-title">
+			<h3>{ req.Title }</h3>
+		</div>
+		<label class="status-cell status-cell--practice">
+			<span class="sr-only">Needs practice</span>
+			<input type="radio" name="status" value="needs_practice" checked?={ req.Status == model.StatusNeedsPractice }/>
+		</label>
+		<label class="status-cell status-cell--mastered">
+			<span class="sr-only">Mastered</span>
+			<input type="radio" name="status" value="mastered" checked?={ req.Status == model.StatusMastered }/>
+		</label>
+		<label class="date-field">
+			<span class="sr-only">Mastered date</span>
+			<input name="mastered_date" type="date" value={ model.DateValue(req.MasteredDate) }/>
+		</label>
+		<label class="notes-field">
+			<span class="sr-only">Practice notes</span>
+			<input name="notes" value={ req.Notes }/>
+		</label>
+		<button class="row-save" type="submit" aria-label={ "Update " + req.Title }>OK</button>
+	</form>
+}
