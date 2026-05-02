@@ -185,7 +185,7 @@ templ ProgressPanel(dashboard model.Dashboard) {
 				<div class="calendar-icon" aria-hidden="true"></div>
 				if estimatePrefix, estimateDate, ok := strings.Cut(dashboard.ReadyEstimate, " for "); ok {
 					<span>{ estimatePrefix } for</span>
-					<strong>{ estimateDate }</strong>
+					<strong class="estimate-date">{ estimateDate }</strong>
 				} else {
 					<strong>{ dashboard.ReadyEstimate }</strong>
 				}

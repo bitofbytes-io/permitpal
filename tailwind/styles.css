@@ -448,7 +448,10 @@ input {
   margin-top: 3px;
   text-align: center;
   font-size: clamp(1.1rem, 1.55vw, 1.38rem);
-  line-height: 1;
+  line-height: 1.08;
+}
+
+.estimate-sign .estimate-date {
   white-space: nowrap;
 }
 
