@@ -2,6 +2,7 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,11 @@ import (
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/ui"
 	"github.com/go-chi/chi/v5"
+)
+
+const (
+	maxTotalHours = 60
+	maxNightHours = 10
 )
 
 type DashboardHandler struct {
@@ -42,14 +48,14 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	totalHours, err := parseHours(r.FormValue("total_hours"))
+	totalHours, err := parseHours(r.FormValue("total_hours"), maxTotalHours)
 	if err != nil {
-		http.Error(w, "Total hours must be a number", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Total hours must be a number from 0 to %d", maxTotalHours), http.StatusBadRequest)
 		return
 	}
-	nightHours, err := parseHours(r.FormValue("night_hours"))
+	nightHours, err := parseHours(r.FormValue("night_hours"), maxNightHours)
 	if err != nil {
-		http.Error(w, "Night hours must be a number", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Night hours must be a number from 0 to %d", maxNightHours), http.StatusBadRequest)
 		return
 	}
 
@@ -104,7 +110,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 	render(w, r, ui.RequirementRow(updated))
 }
 
-func parseHours(value string) (float64, error) {
+func parseHours(value string, max float64) (float64, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return 0, nil
@@ -115,6 +121,9 @@ func parseHours(value string) (float64, error) {
 	parsed, err := strconv.ParseFloat(value, 64)
 	if err != nil || parsed < 0 {
 		return 0, errors.New("invalid hours")
+	}
+	if parsed > max {
+		return 0, errors.New("hours exceed maximum")
 	}
 	return parsed, nil
 }

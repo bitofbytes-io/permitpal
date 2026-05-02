@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -50,7 +51,10 @@ func Load() (*Config, error) {
 	}
 	cfg.SessionCookie = getEnv("SESSION_COOKIE", "permitpal_session")
 	cfg.DefaultUsername = getEnv("PERMITPAL_USERNAME", "driver")
-	cfg.SecureCookies = getEnv("SECURE_COOKIES", defaultSecureCookies(cfg.AppEnv)) != "false"
+	cfg.SecureCookies, err = parseBoolEnv("SECURE_COOKIES", defaultSecureCookies(cfg.AppEnv))
+	if err != nil {
+		return nil, err
+	}
 
 	if cfg.DataStore != DataStoreMemory && cfg.DataStore != DataStorePostgres {
 		return nil, fmt.Errorf("DATA_STORE must be memory or postgres, got %q", cfg.DataStore)
@@ -90,6 +94,15 @@ func defaultSecureCookies(appEnv string) string {
 		return "true"
 	}
 	return "false"
+}
+
+func parseBoolEnv(key, fallback string) (bool, error) {
+	value := getEnv(key, fallback)
+	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean value, got %q", key, value)
+	}
+	return parsed, nil
 }
 
 func getEnv(key, fallback string) string {
