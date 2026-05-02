@@ -13,7 +13,7 @@ func TestParseHoursAllowsSingleDecimalPlace(t *testing.T) {
 	}
 
 	for value, want := range tests {
-		got, err := parseHours(value)
+		got, err := parseHours(value, 60)
 		if err != nil {
 			t.Fatalf("parseHours(%q) returned error: %v", value, err)
 		}
@@ -25,7 +25,15 @@ func TestParseHoursAllowsSingleDecimalPlace(t *testing.T) {
 
 func TestParseHoursRejectsMoreThanOneDecimalPlace(t *testing.T) {
 	for _, value := range []string{"1.23", "34.50", "6.01", "1e1", "-1"} {
-		if _, err := parseHours(value); err == nil {
+		if _, err := parseHours(value, 60); err == nil {
+			t.Fatalf("parseHours(%q) returned nil error", value)
+		}
+	}
+}
+
+func TestParseHoursRejectsValuesAboveMaximum(t *testing.T) {
+	for _, value := range []string{"60.1", "99999"} {
+		if _, err := parseHours(value, 60); err == nil {
 			t.Fatalf("parseHours(%q) returned nil error", value)
 		}
 	}
