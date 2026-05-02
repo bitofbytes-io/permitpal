@@ -21,7 +21,7 @@ func clearAuthEnv(t *testing.T) {
 
 func TestLoadParsesSecureCookiesCaseInsensitively(t *testing.T) {
 	t.Setenv("SECURE_COOKIES", "FALSE")
-	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+	t.Setenv("PERMITPAL_PASSWORD_HASH", "local-password-hash")
 	t.Setenv("SESSION_SECRET", "local-session-secret")
 
 	cfg, err := Load()
@@ -43,7 +43,7 @@ func TestLoadRejectsInvalidSecureCookies(t *testing.T) {
 
 func TestLoadNormalizesAppEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "Production")
-	t.Setenv("DATABASE_URL", "postgres://permitpal:permitpal@localhost:5432/permitpal?sslmode=disable")
+	t.Setenv("DATABASE_URL", "postgres://localhost:5432/permitpal?sslmode=disable")
 	t.Setenv("PERMITPAL_PASSWORD_HASH", "hash")
 	t.Setenv("SESSION_SECRET", "secret")
 

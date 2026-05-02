@@ -10,20 +10,21 @@ Tagline: **Your permit pal—less yelling, more tracking.**
 make dev
 ```
 
-Open `http://localhost:4600` and sign in with the default local password:
+Open `http://localhost:4600` and sign in with your configured local password.
 
-```text
-permitpal
-```
+Set `PERMITPAL_PASSWORD` or `PERMITPAL_PASSWORD_HASH` and `SESSION_SECRET` in
+your untracked `local.mk` first. See `local.mk.example` for the expected keys.
 
 The default development mode uses `DATA_STORE=memory`, so dashboard changes persist only while the process is running.
 
 ## Production-like local run
 
 ```bash
-make migrate DATABASE_URL="postgres://permitpal:permitpal@localhost:5432/permitpal?sslmode=disable"
+make migrate
 make run-postgres
 ```
+
+Set `DATABASE_URL` in `local.mk` or the environment before running Postgres-backed targets.
 
 ## Production database and Swarm setup
 
@@ -38,7 +39,7 @@ grant all privileges on database permitpal to permitpal;
 Apply the schema once from a machine with `goose` and network access to the database:
 
 ```bash
-make migrate DATABASE_URL="postgres://permitpal:<password>@<postgres-host>:8432/permitpal?sslmode=disable"
+make migrate
 ```
 
 The Makefile normalizes the username and password in `DATABASE_URL` before
@@ -48,8 +49,7 @@ passing it to `goose`, so raw reserved password characters such as `^`, `*`,
 The Swarm deployment expects these external secrets:
 
 ```bash
-printf 'postgres://permitpal:<url-encoded-password>@192.168.1.2:8432/permitpal?sslmode=disable' \
-  | docker secret create permitpal_database_url -
+docker secret create permitpal_database_url /path/to/database-url
 
 htpasswd -bnBC 12 "" '<app-password>' | tr -d ':\n' \
   | docker secret create permitpal_password_hash -

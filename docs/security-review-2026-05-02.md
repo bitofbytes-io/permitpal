@@ -39,9 +39,9 @@ If no `PERMITPAL_PASSWORD` or `PERMITPAL_PASSWORD_HASH` is set, config falls bac
 
 **Severity:** High (if internet-reachable)
 
-If `SESSION_SECRET` is missing, app uses static fallback `permitpal-local-dev-session-secret-change-me`. Session uses HMAC signature; a known secret allows forged authenticated cookies.
+If `SESSION_SECRET` is missing, the app should fail startup rather than using a fallback. Session uses HMAC signature; a known or reused secret would allow forged authenticated cookies.
 
-- Evidence: `internal/config/config.go` fallback; `internal/auth/session.go` uses HMAC(session secret) for auth cookie validation.
+- Evidence: `internal/config/config.go` configuration loading; `internal/auth/session.go` uses HMAC(session secret) for auth cookie validation.
 - Impact: full auth bypass (attacker can mint valid cookie).
 
 **Recommendation:**
