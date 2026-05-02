@@ -1,8 +1,15 @@
 package handler
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/drywaters/permitpal/internal/repository"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestParseHoursAllowsSingleDecimalPlace(t *testing.T) {
@@ -43,11 +50,25 @@ func TestParseHoursRejectsValuesAboveMaximum(t *testing.T) {
 }
 
 func TestRequirementNotesLengthLimit(t *testing.T) {
-	notes := strings.Repeat("é", maxNotesChars)
-	if len([]rune(notes)) != maxNotesChars {
-		t.Fatalf("rune count = %d, want %d", len([]rune(notes)), maxNotesChars)
+	notes := strings.Repeat("a", maxNotesChars+1)
+	form := url.Values{
+		"status": {"needs_practice"},
+		"notes":  {notes},
 	}
-	if len(notes) <= maxNotesChars {
-		t.Fatal("test setup failed: non-ASCII notes should use more bytes than runes")
+	req := httptest.NewRequest(http.MethodPost, "/requirements/lane-changes", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	router := chi.NewRouter()
+	handler := NewDashboardHandler(repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)))
+	router.Post("/requirements/{key}", handler.UpdateRequirement)
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	want := "Notes must be 1000 characters or fewer"
+	if !strings.Contains(rec.Body.String(), want) {
+		t.Fatalf("body = %q, want %q", rec.Body.String(), want)
 	}
 }

@@ -21,6 +21,8 @@ func clearAuthEnv(t *testing.T) {
 
 func TestLoadParsesSecureCookiesCaseInsensitively(t *testing.T) {
 	t.Setenv("SECURE_COOKIES", "FALSE")
+	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+	t.Setenv("SESSION_SECRET", "local-session-secret")
 
 	cfg, err := Load()
 	if err != nil {
@@ -68,19 +70,22 @@ func TestLoadFailsForMissingExplicitSecretFile(t *testing.T) {
 	}
 }
 
-func TestLoadUsesDevFallbackSecretsOnlyInDevelopment(t *testing.T) {
+func TestLoadRequiresPasswordSecretInDevelopment(t *testing.T) {
 	clearAuthEnv(t)
 	t.Setenv("APP_ENV", "development")
 
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required") {
+		t.Fatalf("Load error = %v, want missing password secret error", err)
 	}
-	if cfg.Password != "permitpal" {
-		t.Fatalf("Password = %q, want development fallback", cfg.Password)
-	}
-	if cfg.SessionSecret != "permitpal-local-dev-session-secret-change-me" {
-		t.Fatal("SessionSecret did not use development fallback")
+}
+
+func TestLoadRequiresSessionSecretInDevelopment(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET is required") {
+		t.Fatalf("Load error = %v, want missing session secret error", err)
 	}
 }
 
@@ -88,7 +93,7 @@ func TestLoadRejectsMissingSecretsOutsideDevelopment(t *testing.T) {
 	clearAuthEnv(t)
 	t.Setenv("APP_ENV", "staging")
 
-	if _, err := Load(); err == nil {
-		t.Fatal("Load returned nil error for missing secrets outside development")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required") {
+		t.Fatalf("Load error = %v, want missing password secret error", err)
 	}
 }

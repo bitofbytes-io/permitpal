@@ -4,7 +4,6 @@ BIN_DIR ?= bin
 PORT ?= 4600
 APP_ENV ?= development
 DATA_STORE ?= memory
-PERMITPAL_PASSWORD ?= permitpal
 DATABASE_URL ?= postgres://permitpal:permitpal@localhost:5432/permitpal?sslmode=disable
 export DATABASE_URL
 
@@ -36,12 +35,16 @@ tail-prod: ## Build CSS for production, or copy source CSS if Tailwind is unavai
 	fi
 
 dev: templ tail-prod ## Run local visual preview with memory storage and no database
-	APP_ENV=development DATA_STORE=memory PORT=$(PORT) PERMITPAL_PASSWORD=$(PERMITPAL_PASSWORD) go run ./cmd/permitpal
+	@test -n "$(PERMITPAL_PASSWORD)" || (echo "PERMITPAL_PASSWORD must be set in local.mk or the environment" >&2; exit 1)
+	@test -n "$(SESSION_SECRET)" || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
+	APP_ENV=development DATA_STORE=memory PORT=$(PORT) PERMITPAL_PASSWORD="$(PERMITPAL_PASSWORD)" SESSION_SECRET="$(SESSION_SECRET)" go run ./cmd/permitpal
 
 run: dev ## Alias for local preview
 
 run-postgres: templ tail-prod ## Run locally against Postgres
-	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$$($(NORMALIZE_DATABASE_URL))" PERMITPAL_PASSWORD=$(PERMITPAL_PASSWORD) go run ./cmd/permitpal
+	@test -n "$(PERMITPAL_PASSWORD)" || (echo "PERMITPAL_PASSWORD must be set in local.mk or the environment" >&2; exit 1)
+	@test -n "$(SESSION_SECRET)" || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
+	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$$($(NORMALIZE_DATABASE_URL))" PERMITPAL_PASSWORD="$(PERMITPAL_PASSWORD)" SESSION_SECRET="$(SESSION_SECRET)" go run ./cmd/permitpal
 
 build: templ tail-prod ## Build the production binary
 	mkdir -p $(BIN_DIR)

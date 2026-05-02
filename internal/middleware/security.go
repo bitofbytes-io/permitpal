@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -39,8 +40,9 @@ func isStateChangingMethod(method string) bool {
 }
 
 func sameOrigin(r *http.Request) bool {
-	host := strings.ToLower(r.Host)
-	if host == "" {
+	scheme := requestScheme(r)
+	host, port, ok := splitHostPort(r.Host, scheme)
+	if !ok {
 		return false
 	}
 	if origin := r.Header.Get("Origin"); origin != "" {
@@ -48,22 +50,23 @@ func sameOrigin(r *http.Request) bool {
 		if err != nil {
 			return false
 		}
-		return originMatchesRequest(u, r)
+		return originMatches(u, scheme, host, port)
 	}
 	if referer := r.Header.Get("Referer"); referer != "" {
 		u, err := url.Parse(referer)
 		if err != nil {
 			return false
 		}
-		return originMatchesRequest(u, r)
+		return originMatches(u, scheme, host, port)
 	}
 	return false
 }
 
-func originMatchesRequest(u *url.URL, r *http.Request) bool {
+func originMatches(u *url.URL, scheme, host, port string) bool {
 	return u.Scheme != "" &&
-		strings.EqualFold(u.Scheme, requestScheme(r)) &&
-		strings.EqualFold(u.Host, r.Host)
+		strings.EqualFold(u.Scheme, scheme) &&
+		strings.EqualFold(u.Hostname(), host) &&
+		effectivePort(u.Scheme, u.Port()) == port
 }
 
 func requestScheme(r *http.Request) string {
@@ -77,4 +80,29 @@ func requestScheme(r *http.Request) string {
 		return "https"
 	}
 	return "http"
+}
+
+func splitHostPort(hostport, scheme string) (string, string, bool) {
+	if hostport == "" {
+		return "", "", false
+	}
+	host, port, err := net.SplitHostPort(hostport)
+	if err == nil {
+		return host, port, true
+	}
+	host = strings.Trim(hostport, "[]")
+	if host == "" {
+		return "", "", false
+	}
+	return host, effectivePort(scheme, ""), true
+}
+
+func effectivePort(scheme, port string) string {
+	if port != "" {
+		return port
+	}
+	if strings.EqualFold(scheme, "https") {
+		return "443"
+	}
+	return "80"
 }

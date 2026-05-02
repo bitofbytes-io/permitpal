@@ -4,7 +4,9 @@
 PORT := 4600
 APP_ENV := development
 DATA_STORE := memory
-PERMITPAL_PASSWORD := permitpal
+# Set this in your untracked local.mk before running make dev or make run-postgres.
+PERMITPAL_PASSWORD :=
+SESSION_SECRET :=
 
 # Used by make run-postgres and migration targets.
 # The Makefile URL-encodes reserved username/password characters for goose.
