@@ -43,8 +43,11 @@ func TestParseHoursRejectsValuesAboveMaximum(t *testing.T) {
 }
 
 func TestRequirementNotesLengthLimit(t *testing.T) {
-	notes := strings.Repeat("a", maxNotesChars+1)
+	notes := strings.Repeat("é", maxNotesChars)
+	if len([]rune(notes)) != maxNotesChars {
+		t.Fatalf("rune count = %d, want %d", len([]rune(notes)), maxNotesChars)
+	}
 	if len(notes) <= maxNotesChars {
-		t.Fatal("test setup failed")
+		t.Fatal("test setup failed: non-ASCII notes should use more bytes than runes")
 	}
 }

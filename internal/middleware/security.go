@@ -48,14 +48,33 @@ func sameOrigin(r *http.Request) bool {
 		if err != nil {
 			return false
 		}
-		return strings.EqualFold(u.Host, host)
+		return originMatchesRequest(u, r)
 	}
 	if referer := r.Header.Get("Referer"); referer != "" {
 		u, err := url.Parse(referer)
 		if err != nil {
 			return false
 		}
-		return strings.EqualFold(u.Host, host)
+		return originMatchesRequest(u, r)
 	}
 	return false
+}
+
+func originMatchesRequest(u *url.URL, r *http.Request) bool {
+	return u.Scheme != "" &&
+		strings.EqualFold(u.Scheme, requestScheme(r)) &&
+		strings.EqualFold(u.Host, r.Host)
+}
+
+func requestScheme(r *http.Request) string {
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+		if scheme, _, ok := strings.Cut(proto, ","); ok {
+			return strings.TrimSpace(scheme)
+		}
+		return strings.TrimSpace(proto)
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
 }

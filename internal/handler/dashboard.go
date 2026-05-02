@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/drywaters/permitpal/internal/model"
 	"github.com/drywaters/permitpal/internal/repository"
@@ -100,7 +101,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 	existing.Status = status
 	existing.MasteredDate = model.NormalizeDate(r.FormValue("mastered_date"))
 	existing.Notes = strings.TrimSpace(r.FormValue("notes"))
-	if len(existing.Notes) > maxNotesChars {
+	if utf8.RuneCountInString(existing.Notes) > maxNotesChars {
 		http.Error(w, fmt.Sprintf("Notes must be %d characters or fewer", maxNotesChars), http.StatusBadRequest)
 		return
 	}
