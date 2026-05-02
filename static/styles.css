@@ -30,7 +30,7 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
-  background: linear-gradient(180deg, #fffaf0 0%, #efe3ca 72%, #15191a 72%, #15191a 100%);
+  background: linear-gradient(180deg, #fffaf0 0%, #efe3ca 100%);
 }
 button, input, textarea {
   font: inherit;
@@ -210,6 +210,20 @@ input {
   color: white;
   font-weight: 700;
   background: #111719;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+.logout-button:hover {
+  border-color: rgba(255, 201, 22, 0.75);
+  background: #1d2528;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+}
+.logout-button:focus-visible {
+  outline: 2px solid var(--line);
+  outline-offset: 3px;
+}
+.logout-button:active {
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.22);
 }
 .app-shell {
   width: min(1360px, 100%);
@@ -385,6 +399,8 @@ input {
   white-space: nowrap;
 }
 .content-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: 14px;
@@ -697,30 +713,43 @@ input {
   background: linear-gradient(180deg, #fff8d8, #f6d64b);
 }
 .encouragement-banner {
-  min-height: 72px;
-  display: grid;
-  grid-template-columns: minmax(90px, 1fr) auto minmax(0, auto) auto;
-  align-items: center;
-  gap: clamp(16px, 3vw, 34px);
-  margin-top: 20px;
-  padding: 12px clamp(18px, 3vw, 34px);
+  position: relative;
+  z-index: 0;
+  width: 100vw;
+  min-height: 178px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(12px, 2.4vw, 28px);
+  margin: -56px calc(50% - 50vw) 0;
+  padding-top: 96px;
+  padding-right: clamp(52px, 7vw, 104px);
+  padding-bottom: 24px;
+  padding-left: clamp(52px, 7vw, 104px);
   color: white;
   background: #15191a;
 }
 .road-dashes {
-  height: 4px;
+  position: absolute;
+  z-index: 0;
+  top: 82px;
+  right: 0;
+  left: 0;
+  height: 5px;
   background: repeating-linear-gradient(90deg, var(--line) 0 22px, transparent 22px 42px);
 }
 .encouragement-banner span {
+  position: relative;
+  z-index: 1;
   display: inline-grid;
   place-items: center;
-  width: 92px;
-  min-height: 64px;
-  padding: 8px 10px;
+  width: 76px;
+  min-height: 48px;
+  padding: 6px 8px;
   border: 3px solid #e4e8ef;
   border-radius: 8px 8px 18px 18px;
   color: white;
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 700;
   line-height: 1.15;
   text-align: center;
@@ -728,6 +757,8 @@ input {
   background: #245b92;
 }
 .encouragement-banner p {
+  position: relative;
+  z-index: 1;
   margin: 0;
   font-family: "Patrick Hand", cursive;
   font-size: clamp(1.35rem, 2.7vw, 1.9rem);
@@ -735,9 +766,11 @@ input {
   white-space: nowrap;
 }
 .checkers {
-  width: 54px;
-  height: 54px;
-  background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 18px 18px;
+  position: relative;
+  z-index: 1;
+  width: 44px;
+  height: 44px;
+  background: conic-gradient(#fff 25%, #111 0 50%, #fff 0 75%, #111 0) 0 0 / 14.6667px 14.6667px;
   transform: skew(-10deg);
 }
 @media (max-width: 1050px) {
@@ -801,9 +834,6 @@ input {
   html, body {
     overflow-x: hidden;
   }
-  body {
-    background: linear-gradient(180deg, #fffaf0 0%, #efe3ca 86%, #15191a 86%, #15191a 100%);
-  }
   .dash-header {
     flex-wrap: wrap;
     gap: 10px;
@@ -862,15 +892,59 @@ input {
     padding: 86px 8px 10px;
     border-width: 7px;
   }
+  .checklist-reference {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 3px 6px;
+    margin-top: 8px;
+    text-align: right;
+  }
+  .checklist-reference span {
+    margin-right: 0;
+  }
   .clipboard-clip {
     width: 58%;
   }
   .encouragement-banner {
-    grid-template-columns: 1fr;
-    justify-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: flex-start;
+    gap: 8px;
+    min-height: 166px;
+    margin-top: -42px;
+    padding-top: 88px;
+    padding-right: 12px;
+    padding-bottom: 18px;
+    padding-left: 12px;
     text-align: center;
+  }
+  .encouragement-banner span {
+    width: 62px;
+    min-height: 42px;
+    padding: 5px 6px;
+    border-width: 2px;
+    font-size: 0.52rem;
+  }
+  .encouragement-banner p {
+    font-size: clamp(1.02rem, 4.6vw, 1.28rem);
+    line-height: 1;
+    white-space: normal;
+  }
+  .checkers {
+    width: 34px;
+    height: 34px;
+    background-size: 11.3333px 11.3333px;
   }
   .road-dashes {
     width: 100%;
+    top: 74px;
+    bottom: auto;
+  }
+}
+@media (min-width: 721px) {
+  .progress-form button {
+    margin-top: 6px;
   }
 }
