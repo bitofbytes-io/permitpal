@@ -73,16 +73,10 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.Password == "" && cfg.PasswordHash == "" {
-		if cfg.AppEnv != "development" {
-			return nil, errors.New("PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required when APP_ENV is not development")
-		}
-		cfg.Password = ""
+		return nil, errors.New("PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required")
 	}
 	if cfg.SessionSecret == "" {
-		if cfg.AppEnv != "development" {
-			return nil, errors.New("SESSION_SECRET is required when APP_ENV is not development")
-		}
-		cfg.SessionSecret = ""
+		return nil, errors.New("SESSION_SECRET is required")
 	}
 
 	return cfg, nil
