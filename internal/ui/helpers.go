@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/drywaters/permitpal/internal/model"
 )
@@ -36,8 +35,4 @@ func odometerChars(value float64) []string {
 		chars = append(chars, string(char))
 	}
 	return chars
-}
-
-func readyDateLabel(estimate string) string {
-	return strings.TrimPrefix(estimate, "On pace for ")
 }

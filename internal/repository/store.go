@@ -27,6 +27,10 @@ func NewStore(ctx context.Context, cfg *config.Config) (Store, CloseFunc, error)
 		if err != nil {
 			return nil, nil, fmt.Errorf("connect postgres: %w", err)
 		}
+		if err := pool.Ping(ctx); err != nil {
+			pool.Close()
+			return nil, nil, fmt.Errorf("ping postgres: %w", err)
+		}
 		store := NewPostgresStore(pool)
 		return store, pool.Close, nil
 	default:

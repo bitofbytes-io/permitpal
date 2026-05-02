@@ -40,3 +40,25 @@ func TestPercentClampsAtOneHundred(t *testing.T) {
 		t.Fatalf("Percent() = %d, want 100", got)
 	}
 }
+
+func TestPercentDoesNotRoundIncompleteProgressToOneHundred(t *testing.T) {
+	if got := Percent(59.7, 60); got != 99 {
+		t.Fatalf("Percent() = %d, want 99", got)
+	}
+}
+
+func TestNormalizeDateUsesLocalLocation(t *testing.T) {
+	got := NormalizeDate("2026-05-02")
+	if got == nil {
+		t.Fatal("NormalizeDate returned nil")
+	}
+	if got.Location() != time.Local {
+		t.Fatalf("location = %v, want %v", got.Location(), time.Local)
+	}
+}
+
+func TestParseStatusRejectsUnknownValues(t *testing.T) {
+	if _, ok := ParseStatus("done"); ok {
+		t.Fatal("ParseStatus accepted unknown value")
+	}
+}

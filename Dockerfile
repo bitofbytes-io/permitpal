@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 
 FROM golang:1.26-alpine AS builder
+ARG TEMPL_VERSION=v0.3.1001
 WORKDIR /src
 
 RUN apk add --no-cache curl
-RUN go install github.com/a-h/templ/cmd/templ@latest
+RUN go install github.com/a-h/templ/cmd/templ@${TEMPL_VERSION}
 
 COPY go.mod go.sum ./
 RUN go mod download

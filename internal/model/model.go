@@ -75,7 +75,10 @@ func Percent(value, target float64) int {
 	if target <= 0 {
 		return 0
 	}
-	return int(math.Max(0, math.Min(100, math.Round(value/target*100))))
+	if value >= target {
+		return 100
+	}
+	return int(math.Max(0, math.Min(99, math.Floor(value/target*100))))
 }
 
 func EstimateReadyDate(profile Profile, now time.Time) string {
@@ -110,12 +113,14 @@ func FormatHours(hours float64) string {
 	return fmt.Sprintf("%.1f", hours)
 }
 
-func ParseStatus(value string) RequirementStatus {
+func ParseStatus(value string) (RequirementStatus, bool) {
 	switch RequirementStatus(value) {
 	case StatusMastered:
-		return StatusMastered
+		return StatusMastered, true
+	case StatusNeedsPractice:
+		return StatusNeedsPractice, true
 	default:
-		return StatusNeedsPractice
+		return "", false
 	}
 }
 
@@ -177,7 +182,7 @@ func NormalizeDate(value string) *time.Time {
 	if value == "" {
 		return nil
 	}
-	t, err := time.Parse("2006-01-02", value)
+	t, err := time.ParseInLocation("2006-01-02", value, time.Local)
 	if err != nil {
 		return nil
 	}

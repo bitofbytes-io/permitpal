@@ -25,9 +25,21 @@ func (s *MemoryStore) GetDashboard(_ context.Context, now time.Time) (model.Dash
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	profile := s.profile
+	if s.profile.PermitIssueDate != nil {
+		issueDate := *s.profile.PermitIssueDate
+		profile.PermitIssueDate = &issueDate
+	}
+
 	requirements := make([]model.Requirement, len(s.requirements))
-	copy(requirements, s.requirements)
-	return model.NewDashboard(s.profile, requirements, now), nil
+	for idx := range s.requirements {
+		requirements[idx] = s.requirements[idx]
+		if s.requirements[idx].MasteredDate != nil {
+			masteredDate := *s.requirements[idx].MasteredDate
+			requirements[idx].MasteredDate = &masteredDate
+		}
+	}
+	return model.NewDashboard(profile, requirements, now), nil
 }
 
 func (s *MemoryStore) UpdateProfile(_ context.Context, profile model.Profile) (model.Profile, error) {

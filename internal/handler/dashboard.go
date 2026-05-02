@@ -91,7 +91,12 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	existing.Status = model.ParseStatus(r.FormValue("status"))
+	status, ok := model.ParseStatus(r.FormValue("status"))
+	if !ok {
+		http.Error(w, "Status must be needs_practice or mastered", http.StatusBadRequest)
+		return
+	}
+	existing.Status = status
 	existing.MasteredDate = model.NormalizeDate(r.FormValue("mastered_date"))
 	existing.Notes = strings.TrimSpace(r.FormValue("notes"))
 	if existing.Status != model.StatusMastered {

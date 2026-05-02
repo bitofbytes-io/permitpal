@@ -19,7 +19,7 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 }
 
 func (s *PostgresStore) GetDashboard(ctx context.Context, now time.Time) (model.Dashboard, error) {
-	profile, err := s.getProfile(ctx)
+	profile, err := s.getProfile(ctx, now)
 	if err != nil {
 		return model.Dashboard{}, err
 	}
@@ -59,13 +59,13 @@ func (s *PostgresStore) UpdateRequirement(ctx context.Context, req model.Require
 	return req, err
 }
 
-func (s *PostgresStore) getProfile(ctx context.Context) (model.Profile, error) {
+func (s *PostgresStore) getProfile(ctx context.Context, now time.Time) (model.Profile, error) {
 	const query = `select permit_issue_date, total_hours, night_hours, updated_at from app_profile where id = 1`
 	var profile model.Profile
 	err := s.db.QueryRow(ctx, query).
 		Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return s.UpdateProfile(ctx, model.DefaultProfile(time.Now()))
+		return s.UpdateProfile(ctx, model.DefaultProfile(now))
 	}
 	return profile, err
 }

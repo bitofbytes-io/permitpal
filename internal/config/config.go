@@ -30,7 +30,7 @@ func Load() (*Config, error) {
 	cfg := &Config{}
 	var err error
 
-	cfg.AppEnv = getEnv("APP_ENV", "development")
+	cfg.AppEnv = strings.ToLower(strings.TrimSpace(getEnv("APP_ENV", "development")))
 	cfg.DataStore = strings.ToLower(getEnv("DATA_STORE", defaultDataStore(cfg.AppEnv)))
 	cfg.Port = getEnv("PORT", "4600")
 	cfg.DatabaseURL, err = getEnvOrFile("DATABASE_URL", "/run/secrets/permitpal_database_url")
@@ -117,18 +117,18 @@ func getEnvOrFile(key, defaultPath string) (string, error) {
 		return strings.TrimSpace(value), nil
 	}
 	if path := os.Getenv(key + "_FILE"); path != "" {
-		return readSecret(path, key+"_FILE")
+		return readSecret(path, key+"_FILE", false)
 	}
 	if defaultPath != "" {
-		return readSecret(defaultPath, key)
+		return readSecret(defaultPath, key, true)
 	}
 	return "", nil
 }
 
-func readSecret(path, name string) (string, error) {
+func readSecret(path, name string, allowMissing bool) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if allowMissing && errors.Is(err, os.ErrNotExist) {
 			return "", nil
 		}
 		return "", fmt.Errorf("reading %s from %s: %w", name, path, err)

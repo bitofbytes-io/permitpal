@@ -49,3 +49,32 @@ func TestMemoryStoreUpdatesProfile(t *testing.T) {
 		t.Fatalf("updated profile = %#v", updated)
 	}
 }
+
+func TestMemoryStoreDashboardDoesNotShareDatePointers(t *testing.T) {
+	store := NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
+	dashboard, err := store.GetDashboard(context.Background(), time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	*dashboard.Profile.PermitIssueDate = time.Date(1999, 1, 1, 0, 0, 0, 0, time.Local)
+	for idx := range dashboard.Requirements {
+		if dashboard.Requirements[idx].MasteredDate != nil {
+			*dashboard.Requirements[idx].MasteredDate = time.Date(1999, 1, 1, 0, 0, 0, 0, time.Local)
+			break
+		}
+	}
+
+	next, err := store.GetDashboard(context.Background(), time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Profile.PermitIssueDate.Year() == 1999 {
+		t.Fatal("profile permit issue date shared pointer state")
+	}
+	for _, req := range next.Requirements {
+		if req.MasteredDate != nil && req.MasteredDate.Year() == 1999 {
+			t.Fatal("requirement mastered date shared pointer state")
+		}
+	}
+}
