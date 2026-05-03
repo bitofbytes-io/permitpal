@@ -472,6 +472,14 @@ input {
   white-space: nowrap;
 }
 
+.save-feedback {
+  margin: 6px 0 0;
+  color: var(--sign-dark);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .content-grid {
   position: relative;
   z-index: 1;
@@ -853,6 +861,11 @@ input {
 .row-save:hover::before {
   border-color: #88785d;
   background: linear-gradient(180deg, #fff8d8, #f6d64b);
+}
+
+.row-save-feedback {
+  color: var(--sign-dark);
+  font-size: 0.58rem;
 }
 
 .encouragement-banner {

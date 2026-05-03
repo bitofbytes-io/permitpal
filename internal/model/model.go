@@ -92,16 +92,6 @@ func EstimateReadyDate(profile Profile, now time.Time) string {
 	if !ok {
 		return "Add hours to estimate"
 	}
-	if nightDate, ok := projectedRequirementDate(startDate, today, profile.NightHours, NightHoursRequired); ok && nightDate.After(readyDate) {
-		readyDate = nightDate
-	} else if profile.NightHours < NightHoursRequired && !ok {
-		return "Add hours to estimate"
-	}
-
-	holdDate := startDate.AddDate(0, 9, 0)
-	if holdDate.After(readyDate) {
-		readyDate = holdDate
-	}
 
 	if !readyDate.After(today) {
 		return "Ready when checklist is mastered"

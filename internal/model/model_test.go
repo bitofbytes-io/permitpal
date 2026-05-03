@@ -20,18 +20,18 @@ func TestEstimateReadyDateUsesAveragePaceFromStartDate(t *testing.T) {
 	}
 }
 
-func TestEstimateReadyDateUsesPermitHoldWhenLater(t *testing.T) {
+func TestEstimateReadyDateIgnoresPermitHoldAndNightHours(t *testing.T) {
 	issueDate := time.Date(2026, 1, 15, 0, 0, 0, 0, time.Local)
 	profile := Profile{
 		PermitIssueDate: &issueDate,
 		TotalHours:      60,
-		NightHours:      10,
+		NightHours:      0,
 	}
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)
 
 	got := EstimateReadyDate(profile, now)
-	if got != "On pace for October 15, 2026" {
-		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "On pace for October 15, 2026")
+	if got != "Ready when checklist is mastered" {
+		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "Ready when checklist is mastered")
 	}
 }
 
