@@ -73,7 +73,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	updated := model.NewDashboard(profile, current.Requirements, h.now())
-	render(w, r, ui.ProgressPanel(updated))
+	render(w, r, ui.ProgressPanelWithMessage(updated, "Progress saved"))
 }
 
 func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +118,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unable to save requirement", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, ui.RequirementRow(updated))
+	render(w, r, ui.RequirementRowWithMessage(updated, "Saved"))
 }
 
 func parseHours(value string, max float64) (float64, error) {

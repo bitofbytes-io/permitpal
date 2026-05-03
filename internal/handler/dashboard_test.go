@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -46,6 +47,38 @@ func TestParseHoursRejectsValuesAboveMaximum(t *testing.T) {
 		if _, err := parseHours(value, 60); err == nil {
 			t.Fatalf("parseHours(%q) returned nil error", value)
 		}
+	}
+}
+
+func TestUpdateRequirementReturnsSavedFeedback(t *testing.T) {
+	rec := updateRequirementWithNotes(t, "practiced smooth merges")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Saved") {
+		t.Fatalf("body = %q, want Saved feedback", rec.Body.String())
+	}
+}
+
+func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
+	form := url.Values{
+		"total_hours":       {"12.5"},
+		"night_hours":       {"2.0"},
+		"permit_issue_date": {"2026-01-15"},
+	}
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/profile", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	handler := NewDashboardHandler(repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)))
+
+	handler.UpdateProfile(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body = %q", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Progress saved") {
+		t.Fatalf("body = %q, want Progress saved feedback", rec.Body.String())
 	}
 }
 

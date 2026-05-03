@@ -139,6 +139,10 @@ templ DashboardPage(dashboard model.Dashboard) {
 }
 
 templ ProgressPanel(dashboard model.Dashboard) {
+	@ProgressPanelWithMessage(dashboard, "")
+}
+
+templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 	<section id="progress-panel" class="progress-panel" aria-label="Current progress">
 		<div class="metric odometer-metric">
 			<h2>Current hours</h2>
@@ -189,11 +193,18 @@ templ ProgressPanel(dashboard model.Dashboard) {
 					<strong>{ dashboard.ReadyEstimate }</strong>
 				}
 			</div>
+			if savedMessage != "" {
+				<p class="save-feedback" role="status">{ savedMessage }</p>
+			}
 		</div>
 	</section>
 }
 
 templ RequirementRow(req model.Requirement) {
+	@RequirementRowWithMessage(req, "")
+}
+
+templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 	<form
 		id={ "requirement-" + req.Key }
 		class={ "checklist-row " + requirementRowClass(req.Status) }
@@ -221,6 +232,12 @@ templ RequirementRow(req model.Requirement) {
 			<span class="sr-only">Practice notes</span>
 			<input name="notes" value={ req.Notes }/>
 		</label>
-		<button class="row-save" type="submit" aria-label={ "Update " + req.Title }>OK</button>
+		<button class="row-save" type="submit" aria-label={ "Update " + req.Title }>
+			if savedMessage != "" {
+				<span class="row-save-feedback" role="status">{ savedMessage }</span>
+			} else {
+				<span>OK</span>
+			}
+		</button>
 	</form>
 }
