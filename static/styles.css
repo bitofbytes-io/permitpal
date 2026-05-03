@@ -595,7 +595,7 @@ input {
 }
 .checklist-head, .checklist-row {
   display: grid;
-  grid-template-columns: 30px minmax(112px, 0.75fr) 82px 82px 150px minmax(220px, 1.5fr) 44px;
+  grid-template-columns: 30px minmax(112px, 0.75fr) 82px 82px 170px minmax(200px, 1.5fr) 44px;
   width: max(760px, 100%);
   min-width: 0;
 }
@@ -674,7 +674,14 @@ input {
   background: rgba(255, 255, 255, 0.64);
 }
 .date-field input {
+  width: 100%;
+  max-width: 100%;
+  min-inline-size: 0;
   padding-right: 4px;
+  overflow: hidden;
+}
+.date-field input::-webkit-date-and-time-value {
+  min-width: 0;
 }
 .notes-field input {
   width: 100%;
