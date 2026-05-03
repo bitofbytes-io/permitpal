@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -66,7 +67,7 @@ func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
 		"night_hours":       {"2.0"},
 		"permit_issue_date": {"2026-01-15"},
 	}
-	req := httptest.NewRequest(http.MethodPost, "/profile", strings.NewReader(form.Encode()))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/profile", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	handler := NewDashboardHandler(repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)))
