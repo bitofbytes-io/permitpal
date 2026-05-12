@@ -9,8 +9,6 @@ export PERMITPAL_PASSWORD
 export PERMITPAL_PASSWORD_HASH
 export SESSION_SECRET
 
-NORMALIZE_DATABASE_URL = python3 -c 'import os, urllib.parse as u; url = os.environ.get("DATABASE_URL", ""); scheme, sep, rest = url.partition("://"); authority, at, tail = rest.rpartition("@"); valid = bool(sep and at and ":" in authority); user, password = authority.split(":", 1) if valid else ("", ""); user = u.quote(u.unquote(user), safe=""); password = u.quote(u.unquote(password), safe=""); print(scheme + "://" + user + ":" + password + "@" + tail if valid else url)'
-
 REGISTRY ?= registry.bitofbytes.io
 IMAGE_REPO ?= permitpal
 TAG ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
@@ -47,7 +45,7 @@ run-postgres: templ tail-prod ## Run locally against Postgres
 	@test -n '$(PERMITPAL_PASSWORD)$(PERMITPAL_PASSWORD_HASH)' || (echo "PERMITPAL_PASSWORD or PERMITPAL_PASSWORD_HASH must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(SESSION_SECRET)' || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)
-	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$$($(NORMALIZE_DATABASE_URL))" go run ./cmd/permitpal
+	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$(DATABASE_URL)" go run ./cmd/permitpal
 
 build: templ tail-prod ## Build the production binary
 	mkdir -p $(BIN_DIR)
@@ -58,15 +56,15 @@ test: templ ## Run Go tests
 
 migrate: ## Apply Postgres migrations with goose
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)
-	goose -dir migrations postgres "$$($(NORMALIZE_DATABASE_URL))" up
+	goose -dir migrations postgres "$(DATABASE_URL)" up
 
 migrate-down: ## Roll back one Postgres migration
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)
-	goose -dir migrations postgres "$$($(NORMALIZE_DATABASE_URL))" down
+	goose -dir migrations postgres "$(DATABASE_URL)" down
 
 migrate-status: ## Show Postgres migration status
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)
-	goose -dir migrations postgres "$$($(NORMALIZE_DATABASE_URL))" status
+	goose -dir migrations postgres "$(DATABASE_URL)" status
 
 docker-build: templ tail-prod ## Build the Docker image locally
 	docker build -t $(REGISTRY)/$(IMAGE_REPO):$(TAG) .

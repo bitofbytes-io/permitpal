@@ -10,5 +10,5 @@ PERMITPAL_PASSWORD_HASH :=
 SESSION_SECRET :=
 
 # Used by make run-postgres and migration targets.
-# The Makefile URL-encodes reserved username/password characters for goose.
+# URL-encode reserved username/password characters before setting this value.
 DATABASE_URL :=

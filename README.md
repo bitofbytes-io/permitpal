@@ -42,9 +42,8 @@ Apply the schema once from a machine with `goose` and network access to the data
 make migrate
 ```
 
-The Makefile normalizes the username and password in `DATABASE_URL` before
-passing it to `goose`, so raw reserved password characters such as `^`, `*`,
-`@`, `:`, `/`, `?`, `#`, `%`, and `&` are accepted.
+The Makefile passes `DATABASE_URL` through from `local.mk` or the environment.
+URL-encode reserved username or password characters before setting the value.
 
 The Swarm deployment expects these external secrets:
 
