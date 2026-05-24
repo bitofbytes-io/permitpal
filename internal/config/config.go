@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 const (
@@ -79,7 +80,7 @@ func Load() (*Config, error) {
 	if cfg.SessionSecret == "" {
 		return nil, errors.New("SESSION_SECRET is required")
 	}
-	if len(cfg.SessionSecret) < minSessionSecretLength {
+	if utf8.RuneCountInString(cfg.SessionSecret) < minSessionSecretLength {
 		return nil, fmt.Errorf("SESSION_SECRET must be at least %d characters", minSessionSecretLength)
 	}
 
