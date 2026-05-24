@@ -80,7 +80,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 		DataStore:       config.DataStoreMemory,
 		Port:            "4600",
 		Password:        "test-password",
-		SessionSecret:   "test-secret",
+		SessionSecret:   "test-session-secret-32-chars-ok",
 		SessionCookie:   "permitpal_session",
 		DefaultUsername: "driver",
 	}

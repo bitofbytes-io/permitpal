@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	DataStoreMemory   = "memory"
-	DataStorePostgres = "postgres"
+	DataStoreMemory        = "memory"
+	DataStorePostgres      = "postgres"
+	minSessionSecretLength = 32
 )
 
 type Config struct {
@@ -77,6 +78,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.SessionSecret == "" {
 		return nil, errors.New("SESSION_SECRET is required")
+	}
+	if len(cfg.SessionSecret) < minSessionSecretLength {
+		return nil, fmt.Errorf("SESSION_SECRET must be at least %d characters", minSessionSecretLength)
 	}
 
 	return cfg, nil
