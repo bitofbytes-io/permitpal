@@ -72,10 +72,22 @@ func originMatches(u *url.URL, scheme, host, port string) bool {
 func requestScheme(r *http.Request) string {
 	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
 		if scheme, _, ok := strings.Cut(proto, ","); ok {
-			return strings.TrimSpace(scheme)
+			return validRequestScheme(strings.TrimSpace(scheme), r)
 		}
-		return strings.TrimSpace(proto)
+		return validRequestScheme(strings.TrimSpace(proto), r)
 	}
+	return defaultRequestScheme(r)
+}
+
+func validRequestScheme(scheme string, r *http.Request) string {
+	scheme = strings.ToLower(scheme)
+	if scheme == "http" || scheme == "https" {
+		return scheme
+	}
+	return defaultRequestScheme(r)
+}
+
+func defaultRequestScheme(r *http.Request) string {
 	if r.TLS != nil {
 		return "https"
 	}

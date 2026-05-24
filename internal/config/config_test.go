@@ -98,6 +98,17 @@ func TestLoadRejectsShortSessionSecret(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsMultibyteSessionSecretWithTooFewCharacters(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+	t.Setenv("SESSION_SECRET", strings.Repeat("😀", 8))
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET must be at least 32 characters") {
+		t.Fatalf("Load error = %v, want short session secret error", err)
+	}
+}
+
 func TestLoadRejectsMissingSecretsOutsideDevelopment(t *testing.T) {
 	clearAuthEnv(t)
 	t.Setenv("APP_ENV", "staging")
