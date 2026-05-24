@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26.3-alpine3.23 AS builder
 ARG TEMPL_VERSION=v0.3.1001
 WORKDIR /src
 
