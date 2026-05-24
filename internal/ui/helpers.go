@@ -17,17 +17,6 @@ func requirementRowClass(status model.RequirementStatus) string {
 	return "skill-row"
 }
 
-func statusText(status model.RequirementStatus) string {
-	if status == model.StatusMastered {
-		return "Mastered"
-	}
-	return "Needs practice"
-}
-
-func masteredCountLabel(dashboard model.Dashboard) string {
-	return fmt.Sprintf("%d of %d mastered", dashboard.MasteredCount, len(dashboard.Requirements))
-}
-
 func odometerChars(value float64) []string {
 	formatted := fmt.Sprintf("%04.1f", value)
 	chars := make([]string, 0, len(formatted))

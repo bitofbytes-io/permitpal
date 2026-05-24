@@ -20,7 +20,7 @@ func TestLoadParsesSecureCookiesCaseInsensitively(t *testing.T) {
 	t.Setenv("APP_ENV", "development")
 	t.Setenv("SECURE_COOKIES", "FALSE")
 	t.Setenv("PERMITPAL_PASSWORD_HASH", "local-password-hash")
-	t.Setenv("SESSION_SECRET", "local-session-secret")
+	t.Setenv("SESSION_SECRET", "local-session-secret-32-bytes-ok")
 
 	cfg, err := Load()
 	if err != nil {
@@ -43,7 +43,7 @@ func TestLoadNormalizesAppEnv(t *testing.T) {
 	t.Setenv("APP_ENV", "Production")
 	t.Setenv("DATABASE_URL", "postgres://localhost:5432/permitpal?sslmode=disable")
 	t.Setenv("PERMITPAL_PASSWORD_HASH", "hash")
-	t.Setenv("SESSION_SECRET", "secret")
+	t.Setenv("SESSION_SECRET", "production-session-secret-32-bytes-ok")
 
 	cfg, err := Load()
 	if err != nil {
@@ -84,6 +84,17 @@ func TestLoadRequiresSessionSecretInDevelopment(t *testing.T) {
 
 	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET is required") {
 		t.Fatalf("Load error = %v, want missing session secret error", err)
+	}
+}
+
+func TestLoadRejectsShortSessionSecret(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+	t.Setenv("SESSION_SECRET", "short")
+
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET must be at least 32 characters") {
+		t.Fatalf("Load error = %v, want short session secret error", err)
 	}
 }
 

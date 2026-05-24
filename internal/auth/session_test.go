@@ -10,7 +10,7 @@ import (
 func TestManagerPasswordAndSession(t *testing.T) {
 	manager := NewManager(&config.Config{
 		Password:        "test-password",
-		SessionSecret:   "test-secret",
+		SessionSecret:   "test-session-secret-32-chars-ok",
 		SessionCookie:   "permitpal_session",
 		DefaultUsername: "driver",
 	})
