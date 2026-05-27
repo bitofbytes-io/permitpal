@@ -16,6 +16,7 @@ templ LoginPage(errorMessage string) {
 			<title>PermitPal</title>
 			<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
 			<link rel="stylesheet" href="/static/styles.css"/>
+			@UmamiScript()
 		</head>
 		<body class="login-body">
 			<main class="login-shell">
@@ -48,6 +49,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 			<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
 			<link rel="stylesheet" href="/static/styles.css"/>
 			<script src="/static/htmx.min.js" defer></script>
+			@UmamiScript()
 		</head>
 		<body>
 			<header class="dash-header">
@@ -136,6 +138,10 @@ templ DashboardPage(dashboard model.Dashboard) {
 			</div>
 		</body>
 	</html>
+}
+
+templ UmamiScript() {
+	<script async defer data-website-id="f00f467f-a361-4eae-aee2-ef7bbc41ef70" src="https://permitpal.bitofbytes.io/umami/script.js"></script>
 }
 
 templ ProgressPanel(dashboard model.Dashboard) {
