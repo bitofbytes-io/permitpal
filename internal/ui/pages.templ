@@ -141,7 +141,19 @@ templ DashboardPage(dashboard model.Dashboard) {
 }
 
 templ UmamiScript() {
-	<script async defer data-website-id="f00f467f-a361-4eae-aee2-ef7bbc41ef70" src="https://permitpal.bitofbytes.io/umami/script.js"></script>
+	<script>
+		(function () {
+			if (window.location.hostname !== "permitpal.bitofbytes.io") {
+				return;
+			}
+
+			var script = document.createElement("script");
+			script.async = true;
+			script.dataset.websiteId = "f00f467f-a361-4eae-aee2-ef7bbc41ef70";
+			script.src = "https://permitpal.bitofbytes.io/umami/script.js";
+			document.head.appendChild(script);
+		})();
+	</script>
 }
 
 templ ProgressPanel(dashboard model.Dashboard) {
