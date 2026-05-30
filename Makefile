@@ -9,7 +9,7 @@ export PERMITPAL_PASSWORD
 export PERMITPAL_PASSWORD_HASH
 export SESSION_SECRET
 
-REGISTRY ?= registry.bitofbytes.io
+REGISTRY ?= registry.tail209cfc.ts.net
 IMAGE_REPO ?= permitpal
 TAG ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
 PLATFORMS ?= linux/amd64,linux/arm64/v8

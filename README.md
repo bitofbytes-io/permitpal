@@ -56,7 +56,7 @@ htpasswd -bnBC 12 "" '<app-password>' | tr -d ':\n' \
 openssl rand -base64 48 | docker secret create permitpal_session_secret -
 ```
 
-Production deploys through `home_swarm` as `proxy_permitpal` behind Traefik at `permitpal.bitofbytes.io`. The `permitpal/post-receive` hook in `home_swarm` rolls the service after CI pushes a new image tag to `registry.bitofbytes.io/permitpal`.
+Production deploys through `home_swarm` as `proxy_permitpal` behind Traefik at `permitpal.bitofbytes.io`. The `permitpal/post-receive` hook in `home_swarm` rolls the service after CI pushes a new image tag to `registry.tail209cfc.ts.net/permitpal`.
 
 ## Build and test
 
