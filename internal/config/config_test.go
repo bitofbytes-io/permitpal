@@ -60,6 +60,21 @@ func TestLoadNormalizesAppEnv(t *testing.T) {
 	}
 }
 
+func TestLoadNormalizesLogLevel(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("LOG_LEVEL", "WARN")
+	t.Setenv("PERMITPAL_PASSWORD_HASH", "local-password-hash")
+	t.Setenv("SESSION_SECRET", "local-session-secret-32-bytes-ok")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.LogLevel != "warn" {
+		t.Fatalf("LogLevel = %q, want warn", cfg.LogLevel)
+	}
+}
+
 func TestLoadFailsForMissingExplicitSecretFile(t *testing.T) {
 	t.Setenv("SESSION_SECRET_FILE", "/no/such/permitpal/session-secret")
 
