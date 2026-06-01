@@ -18,6 +18,7 @@ const (
 type Config struct {
 	AppEnv          string
 	DataStore       string
+	LogLevel        string
 	Port            string
 	DatabaseURL     string
 	Password        string
@@ -34,6 +35,7 @@ func Load() (*Config, error) {
 
 	cfg.AppEnv = strings.ToLower(strings.TrimSpace(getEnv("APP_ENV", "development")))
 	cfg.DataStore = strings.ToLower(getEnv("DATA_STORE", defaultDataStore(cfg.AppEnv)))
+	cfg.LogLevel = strings.ToLower(strings.TrimSpace(getEnv("LOG_LEVEL", "info")))
 	cfg.Port = getEnv("PORT", "4600")
 	cfg.DatabaseURL, err = getEnvOrFile("DATABASE_URL", "/run/secrets/permitpal_database_url")
 	if err != nil {

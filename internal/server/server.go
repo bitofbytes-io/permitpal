@@ -27,6 +27,7 @@ func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	r.Use(chimw.RealIP)
+	r.Use(middleware.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.RequireSameOrigin)
 	r.Use(middleware.LimitBodyBytes(16 * 1024))
