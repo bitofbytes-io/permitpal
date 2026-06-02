@@ -76,6 +76,8 @@ func TestLoadNormalizesLogLevel(t *testing.T) {
 }
 
 func TestLoadFailsForMissingExplicitSecretFile(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("PERMITPAL_PASSWORD_HASH", "local-password-hash")
 	t.Setenv("SESSION_SECRET_FILE", "/no/such/permitpal/session-secret")
 
 	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "SESSION_SECRET_FILE") {
