@@ -3,6 +3,7 @@ package handler
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -73,6 +74,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	updated := model.NewDashboard(profile, current.Requirements, h.now())
+	slog.Info("profile updated", "total_hours", profile.TotalHours, "night_hours", profile.NightHours, "has_permit_issue_date", profile.PermitIssueDate != nil)
 	render(w, r, ui.ProgressPanelWithMessage(updated, "Progress saved"))
 }
 
@@ -118,6 +120,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unable to save requirement", http.StatusInternalServerError)
 		return
 	}
+	slog.Info("requirement updated", "requirement", updated.Key, "status", updated.Status, "has_mastered_date", updated.MasteredDate != nil)
 	render(w, r, ui.RequirementRowWithMessage(updated, "Saved"))
 }
 
