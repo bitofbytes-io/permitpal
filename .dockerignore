@@ -1,6 +1,7 @@
 .git
 bin
 local.mk
+permitpal.env
 .DS_Store
 tmp
 output

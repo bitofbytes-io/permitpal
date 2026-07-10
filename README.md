@@ -68,11 +68,14 @@ docker run -d --name db --network permitpal \
   -p 5432:5432 \
   -v permitpal-postgres:/var/lib/postgresql/data \
   postgres:17
+
+until docker exec db pg_isready -U permitpal -d permitpal >/dev/null 2>&1; do sleep 1; done
 ```
 
 Apply migrations before starting PermitPal:
 
 ```bash
+go install github.com/pressly/goose/v3/cmd/goose@latest
 export DATABASE_URL='postgres://permitpal:change-me@localhost:5432/permitpal?sslmode=disable'
 goose -dir migrations postgres "$DATABASE_URL" up
 ```
