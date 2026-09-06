@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,12 +46,6 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Unable to read progress form", http.StatusBadRequest)
 		return
 	}
-	current, err := h.store.GetDashboard(r.Context(), h.now())
-	if err != nil {
-		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
-		return
-	}
-
 	totalHours, err := parseHours(r.FormValue("total_hours"), maxTotalHours)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Total hours must be a number from 0 to %d", maxTotalHours), http.StatusBadRequest)
@@ -62,10 +57,22 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	permitIssueDate, err := model.ParseDate(r.FormValue("permit_issue_date"))
+	if err != nil {
+		http.Error(w, "Permit issue date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+
+	current, err := h.store.GetDashboard(r.Context(), h.now())
+	if err != nil {
+		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
+		return
+	}
+
 	profile := current.Profile
 	profile.TotalHours = totalHours
 	profile.NightHours = nightHours
-	profile.PermitIssueDate = model.NormalizeDate(r.FormValue("permit_issue_date"))
+	profile.PermitIssueDate = permitIssueDate
 
 	profile, err = h.store.UpdateProfile(r.Context(), profile)
 	if err != nil {
@@ -83,6 +90,21 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unable to read requirement form", http.StatusBadRequest)
 		return
 	}
+	status, ok := model.ParseStatus(r.FormValue("status"))
+	if !ok {
+		http.Error(w, "Status must be needs_practice or mastered", http.StatusBadRequest)
+		return
+	}
+	masteredDate, err := model.ParseDate(r.FormValue("mastered_date"))
+	if err != nil {
+		http.Error(w, "Mastered date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	notes := strings.TrimSpace(r.FormValue("notes"))
+	if utf8.RuneCountInString(notes) > maxNotesChars {
+		http.Error(w, fmt.Sprintf("Notes must be %d characters or fewer", maxNotesChars), http.StatusBadRequest)
+		return
+	}
 	key := chi.URLParam(r, "key")
 	current, err := h.store.GetDashboard(r.Context(), h.now())
 	if err != nil {
@@ -95,18 +117,9 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	status, ok := model.ParseStatus(r.FormValue("status"))
-	if !ok {
-		http.Error(w, "Status must be needs_practice or mastered", http.StatusBadRequest)
-		return
-	}
 	existing.Status = status
-	existing.MasteredDate = model.NormalizeDate(r.FormValue("mastered_date"))
-	existing.Notes = strings.TrimSpace(r.FormValue("notes"))
-	if utf8.RuneCountInString(existing.Notes) > maxNotesChars {
-		http.Error(w, fmt.Sprintf("Notes must be %d characters or fewer", maxNotesChars), http.StatusBadRequest)
-		return
-	}
+	existing.MasteredDate = masteredDate
+	existing.Notes = notes
 	if existing.Status != model.StatusMastered {
 		existing.MasteredDate = nil
 	}
@@ -133,7 +146,7 @@ func parseHours(value string, max float64) (float64, error) {
 		return 0, errors.New("invalid hours")
 	}
 	parsed, err := strconv.ParseFloat(value, 64)
-	if err != nil || parsed < 0 {
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) || parsed < 0 {
 		return 0, errors.New("invalid hours")
 	}
 	if parsed > max {
