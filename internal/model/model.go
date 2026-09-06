@@ -167,16 +167,16 @@ func RequirementByKey(requirements []Requirement, key string) (Requirement, bool
 	return Requirement{}, false
 }
 
-func NormalizeDate(value string) *time.Time {
+func ParseDate(value string) (*time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return nil
+		return nil, nil
 	}
 	t, err := time.ParseInLocation("2006-01-02", value, time.Local)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &t
+	return &t, nil
 }
 
 func DateValue(date *time.Time) string {

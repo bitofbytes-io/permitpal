@@ -47,10 +47,10 @@ func TestPercentDoesNotRoundIncompleteProgressToOneHundred(t *testing.T) {
 	}
 }
 
-func TestNormalizeDateUsesLocalLocation(t *testing.T) {
-	got := NormalizeDate("2026-05-02")
-	if got == nil {
-		t.Fatal("NormalizeDate returned nil")
+func TestParseDateUsesLocalLocation(t *testing.T) {
+	got, err := ParseDate("2026-05-02")
+	if err != nil || got == nil {
+		t.Fatalf("ParseDate returned %v, %v", got, err)
 	}
 	if got.Location() != time.Local {
 		t.Fatalf("location = %v, want %v", got.Location(), time.Local)
