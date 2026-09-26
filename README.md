@@ -44,7 +44,7 @@ PORT=4600
 SECURE_COOKIES=true
 ```
 
-The image explicitly sets the legacy password-hash file path, so users-file-only deployments must clear `PERMITPAL_PASSWORD_HASH_FILE` as shown. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
+For users-file-only deployments, remove the old secret mount at `/run/secrets/permitpal_password_hash` and clear `PERMITPAL_PASSWORD_HASH`, `PERMITPAL_PASSWORD_HASH_FILE`, `PERMITPAL_PASSWORD`, and `PERMITPAL_PASSWORD_FILE`. Clearing the hash file variable alone still allows the optional default file to load if it remains mounted. Remove the legacy `PERMITPAL_USERNAME` setting too; usernames come from the users file. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
 
 | Setting | Required | Purpose |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ Use `make run-postgres` for a persistent local run and the `make migrate*` targe
 
 ## Upgrade an existing tracker
 
-Back up Postgres before applying migration 003. Stop the old application during the schema change because the old binary cannot read the new schema. Run `DATABASE_URL=... make migrate`, then deploy the new image with the users secret and the legacy hash file override above. Migrations remain a manual deploy step.
+Back up Postgres before applying migration 003. Stop the old application during the schema change because the old binary cannot read the new schema. Run `DATABASE_URL=... make migrate`, then deploy the new image with the users secret. Remove the legacy password-hash secret mount and clear the legacy credential variables listed above so the old account is not loaded alongside the users file. Migrations remain a manual deploy step.
 
 The old `driver` login and its cookies stop working when only `caleb` and `aiden` are configured. Caleb logs in as `caleb` with his existing password; Aiden logs in as `aiden` and sets his permit issue date. Preserve Caleb's current bcrypt hash in the users file if his password should remain unchanged. His saved mastered ratings become Good, and needs-practice ratings become Fair. Rated dates and notes are preserved.
 
