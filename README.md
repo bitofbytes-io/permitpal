@@ -22,8 +22,8 @@ Create separate bcrypt credentials. These commands prompt for each password:
 
 ```bash
 umask 077
-htpasswd -cB permitpal_users caleb
-htpasswd -B permitpal_users aiden
+htpasswd -cB -C 12 permitpal_users caleb
+htpasswd -B -C 12 permitpal_users aiden
 openssl rand -base64 48
 ```
 
