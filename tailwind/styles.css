@@ -1110,7 +1110,8 @@ input {
     grid-template-areas:
       "num title title title title title title"
       "num bad bad fair fair good good"
-      "num date date date notes notes save";
+      "num date date date date date date"
+      "num notes notes notes notes save save";
     width: 100%;
     border-bottom: 1px solid var(--table-line);
   }
@@ -1164,6 +1165,10 @@ input {
     gap: 2px;
     align-content: end;
     padding: 0 4px 8px 8px;
+  }
+
+  .checklist-row .date-field {
+    padding-bottom: 4px;
   }
 
   .checklist-row .status-cell .sr-only,
