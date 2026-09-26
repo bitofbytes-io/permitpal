@@ -1,6 +1,6 @@
 # PermitPal
 
-PermitPal is a self-hosted Go dashboard for tracking progress toward the North Carolina learner permit exam. It supports an in-memory preview and persistent PostgreSQL deployments protected by a shared login.
+PermitPal is a self-hosted Go dashboard for tracking progress toward the North Carolina Level 2 road test. Each driver has a separate login and tracker for the Level 1 to Level 2 requirement of 60 total driving hours, including 10 night hours. It supports an ephemeral in-memory preview and persistent PostgreSQL deployments.
 
 ## Requirements
 
@@ -18,43 +18,50 @@ docker build -t permitpal:local .
 
 ## Configure the application
 
-Generate a bcrypt password hash and a session secret:
+Create separate bcrypt credentials. These commands prompt for each password:
 
 ```bash
-htpasswd -bnBC 12 "" 'choose-a-strong-password' | tr -d ':\n'
+umask 077
+htpasswd -cB permitpal_users caleb
+htpasswd -B permitpal_users aiden
 openssl rand -base64 48
 ```
 
-Create an untracked `permitpal.env` file and paste the generated values:
+Use `-c` only for the first account because it replaces the file. Keep the users file private and outside Git. A new username gets a fresh tracker on first login, with zero hours, no permit date, and the 17 road-test skills. Caleb's migrated tracker retains his original 13 skills and history.
+
+Mount `permitpal_users` at `/run/secrets/permitpal_users`. With Docker Swarm, create an external secret using `docker secret create permitpal_users permitpal_users` and mount it on every PermitPal replica. Swarm distributes the secret to the hosts running those replicas. Restart or redeploy after credential changes. The application reads credentials at startup; a removed account's cookie is rejected by the updated replicas.
+
+Create an untracked `permitpal.env` file:
 
 ```dotenv
 APP_ENV=production
 DATA_STORE=postgres
 DATABASE_URL=postgres://permitpal:change-me@db:5432/permitpal?sslmode=disable
-PERMITPAL_PASSWORD_HASH=replace-with-generated-bcrypt-hash
-SESSION_SECRET=replace-with-generated-session-secret
-PERMITPAL_USERNAME=driver
+PERMITPAL_USERS_FILE=/run/secrets/permitpal_users
+PERMITPAL_PASSWORD_HASH_FILE=
+SESSION_SECRET=replace-with-a-32-character-or-longer-session-secret
 PORT=4600
-SECURE_COOKIES=false
+SECURE_COOKIES=true
 ```
 
-Do not commit this file. Set `SECURE_COOKIES=true` when the application is served over HTTPS.
+The image explicitly sets the legacy password-hash file path, so users-file-only deployments must clear `PERMITPAL_PASSWORD_HASH_FILE` as shown. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
 
 | Setting | Required | Purpose |
 | --- | --- | --- |
 | `APP_ENV` | No | Docker defaults to `production`; local runs default to `development` |
 | `DATA_STORE` | No | Docker defaults to `postgres`; development defaults to `memory` |
 | `DATABASE_URL` | With Postgres | PostgreSQL connection string |
-| `PERMITPAL_PASSWORD_HASH` | In production | Bcrypt hash for the shared login |
-| `PERMITPAL_PASSWORD` | Development only | Plain-text alternative for local preview |
+| `PERMITPAL_USERS` / `PERMITPAL_USERS_FILE` | Users or legacy hash in production | Newline-separated `username:bcrypthash` entries; the optional default file is `/run/secrets/permitpal_users` |
+| `PERMITPAL_PASSWORD_HASH` | Alternative credential | Legacy bcrypt hash paired with `PERMITPAL_USERNAME` |
+| `PERMITPAL_PASSWORD` | Development only | Plaintext legacy alternative; rejected in production |
 | `SESSION_SECRET` | Yes | Session-signing secret of at least 32 characters |
-| `PERMITPAL_USERNAME` | No | Login username; defaults to `driver` |
+| `PERMITPAL_USERNAME` | Legacy account only | Defaults to `driver`; choose `caleb` to access migrated history |
 | `SESSION_COOKIE` | No | Cookie name; defaults to `permitpal_session` |
 | `SECURE_COOKIES` | No | Defaults to `true` in production and `false` in development |
 | `PORT` | No | HTTP port; defaults to `4600` |
 | `LOG_LEVEL` | No | Application log level; defaults to `info` |
 
-The database URL, password, password hash, and session secret support corresponding `*_FILE` variables. The image defaults to files under `/run/secrets/permitpal_*` for the production secrets.
+Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames across users entries and the legacy account are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, password, password hash, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
 
 ## Database and migrations
 
@@ -85,13 +92,14 @@ goose -dir migrations postgres "$DATABASE_URL" up
 ```bash
 docker run --rm --name permitpal --network permitpal \
   --env-file permitpal.env \
+  --mount type=bind,src="$(pwd)/permitpal_users",dst=/run/secrets/permitpal_users,readonly \
   -p 4600:4600 \
   permitpal:local
 ```
 
 Open <http://localhost:4600>. The health endpoint is <http://localhost:4600/health>.
 
-For a disposable preview, override the image's production database secret path:
+For a disposable preview, clear the production secret paths:
 
 ```bash
 docker run --rm -p 4600:4600 \
@@ -99,12 +107,13 @@ docker run --rm -p 4600:4600 \
   -e DATA_STORE=memory \
   -e DATABASE_URL_FILE= \
   -e PERMITPAL_PASSWORD_HASH_FILE= \
+  -e PERMITPAL_USERS_FILE= \
   -e PERMITPAL_PASSWORD=local-password \
   -e SESSION_SECRET=replace-with-a-32-character-or-longer-secret \
   permitpal:local
 ```
 
-Postgres and migrations are not needed in this mode.
+Postgres and migrations are not needed in this mode. Log in as `driver`; all preview data disappears on restart.
 
 ## Development
 
@@ -115,3 +124,22 @@ make test
 ```
 
 Use `make run-postgres` for a persistent local run and the `make migrate*` targets for database maintenance.
+
+## Upgrade an existing tracker
+
+Back up Postgres before applying migration 003. Stop the old application during the schema change because the old binary cannot read the new schema. Run `DATABASE_URL=... make migrate`, then deploy the new image with the users secret and the legacy hash file override above. Migrations remain a manual deploy step.
+
+The old `driver` login and its cookies stop working when only `caleb` and `aiden` are configured. Caleb logs in as `caleb` with his existing password; Aiden logs in as `aiden` and sets his permit issue date. Preserve Caleb's current bcrypt hash in the users file if his password should remain unchanged. His saved mastered ratings become Good, and needs-practice ratings become Fair. Rated dates and notes are preserved.
+
+Migration 003 can be reversed on a scratch database with `make migrate-down` then `make migrate`. A downgrade deliberately deletes all drivers except Caleb and maps Good to mastered and other ratings to needs-practice. Do not downgrade production without a backup and an explicit decision to discard other drivers' data.
+
+## Verification
+
+```bash
+make test
+PERMITPAL_TEST_DATABASE_URL='postgres://user:password@localhost/permitpal_test?sslmode=disable' go test -race ./internal/...
+go vet ./...
+make build
+```
+
+Database tests use isolated temporary schemas and verify migration 003 up/down/up. Use only a disposable database for the test URL. For two-account browser checks, set `PERMITPAL_USERS_FILE` and `SESSION_SECRET` in `local.mk`, then run `make dev`. Sign in as each driver, save hours and a rating, and confirm that the other driver's tracker is unchanged.

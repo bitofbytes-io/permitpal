@@ -713,8 +713,8 @@ input {
 .checklist-head,
 .checklist-row {
   display: grid;
-  grid-template-columns: 30px minmax(112px, 0.75fr) 82px 82px 170px minmax(200px, 1.5fr) 44px;
-  width: max(760px, 100%);
+  grid-template-columns: 30px minmax(190px, 1.25fr) 48px 48px 48px 155px minmax(170px, 1fr) 44px;
+  width: max(850px, 100%);
   min-width: 0;
 }
 
@@ -761,7 +761,9 @@ input {
 
 .skill-title {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   padding: 6px 8px;
 }
 
@@ -783,7 +785,7 @@ input {
   accent-color: var(--sign);
 }
 
-.status-cell--practice input {
+.status-cell--bad input {
   accent-color: var(--brake);
 }
 
@@ -1150,3 +1152,12 @@ input {
     margin-top: 6px;
   }
 }
+
+.skill-description { margin: 5px 0 0; font-size: 0.7rem; line-height: 1.35; color: #514b43; }
+.status-cell--fair input { accent-color: #a56600; }
+.status-cell--good input { accent-color: var(--sign); }
+.skill-row--bad { background: #fbe3e0; }
+.skill-row--fair { background: #fff1ca; }
+.skill-row--good { background: #e4efda; }
+.checklist-head span:nth-child(4) { color: #926000; }
+.checklist-head span:nth-child(5) { color: var(--sign); }

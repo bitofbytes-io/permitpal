@@ -20,7 +20,7 @@ func TestEstimateReadyDateUsesAveragePaceFromStartDate(t *testing.T) {
 	}
 }
 
-func TestEstimateReadyDateIgnoresPermitHoldAndNightHours(t *testing.T) {
+func TestEstimateReadyDateRequiresNightHours(t *testing.T) {
 	issueDate := time.Date(2026, 1, 15, 0, 0, 0, 0, time.Local)
 	profile := Profile{
 		PermitIssueDate: &issueDate,
@@ -30,8 +30,8 @@ func TestEstimateReadyDateIgnoresPermitHoldAndNightHours(t *testing.T) {
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)
 
 	got := EstimateReadyDate(profile, now)
-	if got != "Ready when checklist is mastered" {
-		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "Ready when checklist is mastered")
+	if got != "Add night hours to estimate" {
+		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "Add night hours to estimate")
 	}
 }
 
@@ -57,8 +57,49 @@ func TestParseDateUsesLocalLocation(t *testing.T) {
 	}
 }
 
-func TestParseStatusRejectsUnknownValues(t *testing.T) {
-	if _, ok := ParseStatus("done"); ok {
-		t.Fatal("ParseStatus accepted unknown value")
+func TestParseRatingRejectsUnknownValues(t *testing.T) {
+	if _, ok := ParseRating("done"); ok {
+		t.Fatal("ParseRating accepted unknown value")
+	}
+}
+
+func TestNewDriverDefaultsAndFocus(t *testing.T) {
+	now := time.Now()
+	requirements := DefaultRequirements(now)
+	want := []string{"Quick stop", "Turn about", "Stop on grade", "Start on grade", "Backing", "Approach corner", "Right turns", "Left turns", "Traffic lights", "Use of controls", "Starts", "Use of lane", "Use of brake", "Following", "Attention", "Stop signs", "Parking"}
+	if len(requirements) != len(want) {
+		t.Fatal("wrong checklist length")
+	}
+	for i, req := range requirements {
+		if req.Title != want[i] || req.SortOrder != i+1 || req.Rating != RatingNotRated || req.RatedOn != nil || req.Description == "" {
+			t.Fatalf("bad default: %+v", req)
+		}
+	}
+	requirements[5].Rating = RatingFair
+	requirements[9].Rating = RatingBad
+	requirements[10].Rating = RatingBad
+	requirements[0].Rating = RatingGood
+	dash := NewDashboard(NewDriver("aiden"), NewDriverProfile(now), requirements, now)
+	if dash.Driver.DisplayName != "Aiden" || dash.GoodCount != 1 || dash.PracticeFocus[0].SortOrder != 10 || dash.PracticeFocus[1].SortOrder != 11 || dash.PracticeFocus[2].SortOrder != 6 {
+		t.Fatalf("dashboard=%+v", dash)
+	}
+	if dash.ReadyEstimate != "Add permit issue date to estimate" {
+		t.Fatal(dash.ReadyEstimate)
+	}
+	if rating, ok := ParseRating(""); !ok || rating != RatingNotRated {
+		t.Fatal("empty rating should be not rated")
+	}
+}
+func TestEstimateUsesLaterNightProjection(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start.AddDate(0, 0, 30)
+	profile := Profile{PermitIssueDate: &start, TotalHours: 30, NightHours: 2}
+	if got := EstimateReadyDate(profile, now); got != "On pace for May 31, 2026" {
+		t.Fatal(got)
+	}
+	profile.TotalHours = 60
+	profile.NightHours = 10
+	if got := EstimateReadyDate(profile, now); got != "Ready when every skill is rated Good" {
+		t.Fatal(got)
 	}
 }

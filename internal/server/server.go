@@ -42,14 +42,14 @@ func (s *Server) Router() http.Handler {
 	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
 	authManager := auth.NewManager(s.cfg)
-	authHandler := handler.NewAuthHandler(authManager)
+	authHandler := handler.NewAuthHandler(authManager, s.store)
 	r.Get("/login", authHandler.LoginPage)
 	r.Post("/login", authHandler.Login)
 	r.Post("/logout", authHandler.Logout)
 
 	dashboardHandler := handler.NewDashboardHandler(s.store)
 	r.Group(func(r chi.Router) {
-		r.Use(middleware.RequireAuth(authManager))
+		r.Use(middleware.RequireAuth(authManager, s.store))
 		r.Get("/", dashboardHandler.Dashboard)
 		r.Post("/profile", dashboardHandler.UpdateProfile)
 		r.Post("/requirements/{key}", dashboardHandler.UpdateRequirement)

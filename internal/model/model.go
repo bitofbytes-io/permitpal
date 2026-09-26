@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 )
@@ -12,12 +13,28 @@ const (
 	NightHoursRequired = 10.0
 )
 
-type RequirementStatus string
+type RequirementRating string
 
 const (
-	StatusNeedsPractice RequirementStatus = "needs_practice"
-	StatusMastered      RequirementStatus = "mastered"
+	RatingNotRated RequirementRating = "not_rated"
+	RatingGood     RequirementRating = "good"
+	RatingBad      RequirementRating = "bad"
+	RatingFair     RequirementRating = "fair"
 )
+
+type Driver struct {
+	ID          int64
+	Username    string
+	DisplayName string
+}
+
+func NewDriver(username string) Driver {
+	name := username
+	if len(name) > 0 {
+		name = strings.ToUpper(name[:1]) + name[1:]
+	}
+	return Driver{Username: username, DisplayName: name}
+}
 
 type Profile struct {
 	PermitIssueDate *time.Time
@@ -27,48 +44,45 @@ type Profile struct {
 }
 
 type Requirement struct {
-	Key          string
-	Title        string
-	Description  string
-	Status       RequirementStatus
-	MasteredDate *time.Time
-	Notes        string
-	SortOrder    int
-	UpdatedAt    time.Time
+	Key         string
+	Title       string
+	Description string
+	Rating      RequirementRating
+	RatedOn     *time.Time
+	Notes       string
+	SortOrder   int
+	UpdatedAt   time.Time
 }
 
 type Dashboard struct {
+	Driver        Driver
 	Profile       Profile
 	Requirements  []Requirement
 	PracticeFocus []Requirement
 	ReadyEstimate string
 	TotalPercent  int
 	NightPercent  int
-	MasteredCount int
+	GoodCount     int
 }
 
-func NewDashboard(profile Profile, requirements []Requirement, now time.Time) Dashboard {
-	mastered := 0
+func NewDashboard(driver Driver, profile Profile, requirements []Requirement, now time.Time) Dashboard {
+	ordered := append([]Requirement(nil), requirements...)
+	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].SortOrder < ordered[j].SortOrder })
+	good := 0
+	for _, req := range ordered {
+		if req.Rating == RatingGood {
+			good++
+		}
+	}
 	focus := make([]Requirement, 0, 3)
-	for _, req := range requirements {
-		if req.Status == StatusMastered {
-			mastered++
-			continue
-		}
-		if len(focus) < 3 {
-			focus = append(focus, req)
+	for _, rating := range []RequirementRating{RatingBad, RatingFair, RatingNotRated} {
+		for _, req := range ordered {
+			if req.Rating == rating && len(focus) < 3 {
+				focus = append(focus, req)
+			}
 		}
 	}
-
-	return Dashboard{
-		Profile:       profile,
-		Requirements:  requirements,
-		PracticeFocus: focus,
-		ReadyEstimate: EstimateReadyDate(profile, now),
-		TotalPercent:  Percent(profile.TotalHours, TotalHoursRequired),
-		NightPercent:  Percent(profile.NightHours, NightHoursRequired),
-		MasteredCount: mastered,
-	}
+	return Dashboard{Driver: driver, Profile: profile, Requirements: ordered, PracticeFocus: focus, ReadyEstimate: EstimateReadyDate(profile, now), TotalPercent: Percent(profile.TotalHours, TotalHoursRequired), NightPercent: Percent(profile.NightHours, NightHoursRequired), GoodCount: good}
 }
 
 func Percent(value, target float64) int {
@@ -82,7 +96,10 @@ func Percent(value, target float64) int {
 }
 
 func EstimateReadyDate(profile Profile, now time.Time) string {
-	startDate := DrivingStartDate(profile)
+	if profile.PermitIssueDate == nil {
+		return "Add permit issue date to estimate"
+	}
+	startDate := startOfDay(*profile.PermitIssueDate)
 	today := startOfDay(now)
 	if !today.After(startDate) {
 		return "Add hours to estimate"
@@ -93,8 +110,15 @@ func EstimateReadyDate(profile Profile, now time.Time) string {
 		return "Add hours to estimate"
 	}
 
+	nightDate, ok := projectedRequirementDate(startDate, today, profile.NightHours, NightHoursRequired)
+	if !ok {
+		return "Add night hours to estimate"
+	}
+	if nightDate.After(readyDate) {
+		readyDate = nightDate
+	}
 	if !readyDate.After(today) {
-		return "Ready when checklist is mastered"
+		return "Ready when every skill is rated Good"
 	}
 	return "On pace for " + readyDate.Format("January 2, 2006")
 }
@@ -103,59 +127,44 @@ func FormatHours(hours float64) string {
 	return fmt.Sprintf("%.1f", hours)
 }
 
-func ParseStatus(value string) (RequirementStatus, bool) {
-	switch RequirementStatus(value) {
-	case StatusMastered:
-		return StatusMastered, true
-	case StatusNeedsPractice:
-		return StatusNeedsPractice, true
+func ParseRating(value string) (RequirementRating, bool) {
+	switch RequirementRating(value) {
+	case "", RatingNotRated:
+		return RatingNotRated, true
+	case RatingBad, RatingFair, RatingGood:
+		return RequirementRating(value), true
 	default:
 		return "", false
 	}
 }
 
-func DefaultProfile(now time.Time) Profile {
-	issueDate := DefaultDrivingStartDate()
-	return Profile{
-		PermitIssueDate: &issueDate,
-		TotalHours:      34.5,
-		NightHours:      6.0,
-		UpdatedAt:       now,
-	}
-}
-
-func DefaultDrivingStartDate() time.Time {
-	return time.Date(2025, time.July, 24, 0, 0, 0, 0, time.Local)
-}
-
-func DrivingStartDate(profile Profile) time.Time {
-	if profile.PermitIssueDate != nil {
-		return startOfDay(*profile.PermitIssueDate)
-	}
-	return DefaultDrivingStartDate()
-}
+func NewDriverProfile(now time.Time) Profile { return Profile{UpdatedAt: now} }
 
 func DefaultRequirements(now time.Time) []Requirement {
-	masteredDate := func(month time.Month, day int) *time.Time {
-		t := time.Date(2026, month, day, 0, 0, 0, 0, time.Local)
-		return &t
+	items := []struct{ key, title, description string }{
+		{"quick-stop", "Quick stop", "Stop quickly and safely on the examiner's signal, keeping the car straight and under control."},
+		{"turn-about", "Turn about", "Check traffic, signal, and complete the turn safely with control and room to maneuver."},
+		{"stop-on-grade", "Stop on grade", "Stop under control, turn the wheels correctly for the slope, and set the parking brake."},
+		{"start-on-grade", "Start on grade", "Check traffic, release the parking brake, and move smoothly without rolling backward."},
+		{"backing", "Backing", "Look behind you and back slowly in a straight line while checking for traffic."},
+		{"approach-corner", "Approach corner", "Check traffic, signal early, and slow to a safe speed before reaching the corner."},
+		{"right-turns", "Right turns", "Signal, yield to pedestrians and traffic, and turn into the proper lane without swinging wide."},
+		{"left-turns", "Left turns", "Signal, yield to oncoming traffic and pedestrians, and finish in the proper lane."},
+		{"traffic-lights", "Traffic lights", "Observe signals, stop behind the line, and check traffic before proceeding on green."},
+		{"use-of-controls", "Use of controls", "Use mirrors, signals, steering, and other vehicle controls correctly without distraction."},
+		{"starts", "Starts", "Check mirrors and blind spots, signal when needed, and accelerate smoothly into traffic."},
+		{"use-of-lane", "Use of lane", "Keep a steady lane position and check mirrors and blind spots before changing lanes."},
+		{"use-of-brake", "Use of brake", "Brake smoothly and early enough to stop safely while keeping control."},
+		{"following", "Following", "Maintain at least a 2–3 second gap and allow more space in poor conditions."},
+		{"attention", "Attention", "Watch the road, scan for hazards, and respond safely to traffic and pedestrians."},
+		{"stop-signs", "Stop signs", "Make a complete stop behind the line and check traffic before proceeding."},
+		{"parking", "Parking", "Check surroundings, signal, and park safely within the space with the vehicle secured."},
 	}
-	items := []Requirement{
-		{"starting-the-car", "Starting the car", "Adjust seat, buckle seat belt, adjust mirrors, start smoothly.", StatusMastered, masteredDate(time.March, 8), "Smooth startup routine.", 1, now},
-		{"posture", "Posture", "Sit at least 10 inches from the wheel with clear visibility.", StatusMastered, masteredDate(time.March, 11), "Check mirrors before moving.", 2, now},
-		{"forward-movement", "Forward movement", "Signal before pulling into traffic, accelerate smoothly, hold lane position.", StatusMastered, masteredDate(time.March, 18), "", 3, now},
-		{"traffic-lights", "Traffic lights", "Observe signals, stop smoothly behind the line, start promptly on green.", StatusMastered, masteredDate(time.March, 25), "", 4, now},
-		{"stop-signs", "Stop signs", "Observe signs early, stop completely, check traffic before proceeding.", StatusMastered, masteredDate(time.April, 2), "", 5, now},
-		{"yield-caution-lights", "Yield signs and caution lights", "Adjust speed, check traffic flow, yield to vehicles with right of way.", StatusNeedsPractice, nil, "Needs calmer speed adjustment.", 6, now},
-		{"lane-changes", "Lane changes", "Signal in advance, check mirrors, look over shoulder, change smoothly.", StatusNeedsPractice, nil, "Practice on multilane roads.", 7, now},
-		{"turn-lanes", "Use of turn lanes", "Signal in advance, check mirrors and shoulder, enter turn lane properly.", StatusNeedsPractice, nil, "", 8, now},
-		{"left-right-turns", "Left and right turns", "Signal, check traffic, leave space, stay in correct lane, avoid cutting corners.", StatusNeedsPractice, nil, "Good right turns; left turns need consistency.", 9, now},
-		{"backing", "Backing", "Look over shoulder through rear window, back slowly and smoothly in a straight line.", StatusNeedsPractice, nil, "Practice driveway backing.", 10, now},
-		{"parking", "Parking", "Signal into space, park between lines, pull completely into space.", StatusMastered, masteredDate(time.April, 12), "", 11, now},
-		{"three-point-turn", "Three point turn / turn about", "Signal, stop, check mirrors and shoulders, complete turn safely without rushing.", StatusNeedsPractice, nil, "Next practice focus.", 12, now},
-		{"driver-courtesy", "Driver courtesy", "Show patience, maintain distance, avoid aggressive driving.", StatusMastered, masteredDate(time.April, 20), "Calm and steady.", 13, now},
+	requirements := make([]Requirement, len(items))
+	for i, item := range items {
+		requirements[i] = Requirement{Key: item.key, Title: item.title, Description: item.description, Rating: RatingNotRated, SortOrder: i + 1, UpdatedAt: now}
 	}
-	return items
+	return requirements
 }
 
 func RequirementByKey(requirements []Requirement, key string) (Requirement, bool) {

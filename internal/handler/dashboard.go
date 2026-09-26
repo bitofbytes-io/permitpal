@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/model"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/ui"
@@ -33,7 +34,12 @@ func NewDashboardHandler(store repository.Store) *DashboardHandler {
 }
 
 func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
-	dashboard, err := h.store.GetDashboard(r.Context(), h.now())
+	driver, ok := middleware.DriverFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
+	dashboard, err := h.store.GetDashboard(r.Context(), driver, h.now())
 	if err != nil {
 		http.Error(w, "Unable to load dashboard", http.StatusInternalServerError)
 		return
@@ -42,6 +48,11 @@ func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	driver, ok := middleware.DriverFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to read progress form", http.StatusBadRequest)
 		return
@@ -63,7 +74,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	current, err := h.store.GetDashboard(r.Context(), h.now())
+	current, err := h.store.GetDashboard(r.Context(), driver, h.now())
 	if err != nil {
 		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
 		return
@@ -74,30 +85,35 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	profile.NightHours = nightHours
 	profile.PermitIssueDate = permitIssueDate
 
-	profile, err = h.store.UpdateProfile(r.Context(), profile)
+	profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile)
 	if err != nil {
 		http.Error(w, "Unable to save progress", http.StatusInternalServerError)
 		return
 	}
 
-	updated := model.NewDashboard(profile, current.Requirements, h.now())
+	updated := model.NewDashboard(driver, profile, current.Requirements, h.now())
 	slog.Info("profile updated", "total_hours", profile.TotalHours, "night_hours", profile.NightHours, "has_permit_issue_date", profile.PermitIssueDate != nil)
 	render(w, r, ui.ProgressPanelWithMessage(updated, "Progress saved"))
 }
 
 func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Request) {
+	driver, ok := middleware.DriverFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Authentication required", http.StatusUnauthorized)
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to read requirement form", http.StatusBadRequest)
 		return
 	}
-	status, ok := model.ParseStatus(r.FormValue("status"))
+	rating, ok := model.ParseRating(r.FormValue("rating"))
 	if !ok {
-		http.Error(w, "Status must be needs_practice or mastered", http.StatusBadRequest)
+		http.Error(w, "Rating must be not_rated, bad, fair, or good", http.StatusBadRequest)
 		return
 	}
-	masteredDate, err := model.ParseDate(r.FormValue("mastered_date"))
+	ratedOn, err := model.ParseDate(r.FormValue("rated_on"))
 	if err != nil {
-		http.Error(w, "Mastered date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
+		http.Error(w, "Last rated date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
 	}
 	notes := strings.TrimSpace(r.FormValue("notes"))
@@ -106,7 +122,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	key := chi.URLParam(r, "key")
-	current, err := h.store.GetDashboard(r.Context(), h.now())
+	current, err := h.store.GetDashboard(r.Context(), driver, h.now())
 	if err != nil {
 		http.Error(w, "Unable to load requirement", http.StatusInternalServerError)
 		return
@@ -117,14 +133,17 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	existing.Status = status
-	existing.MasteredDate = masteredDate
+	existing.Rating = rating
+	existing.RatedOn = ratedOn
 	existing.Notes = notes
-	if existing.Status != model.StatusMastered {
-		existing.MasteredDate = nil
+	if existing.Rating == model.RatingNotRated {
+		existing.RatedOn = nil
+	} else if existing.RatedOn == nil {
+		date, _ := model.ParseDate(h.now().Format("2006-01-02"))
+		existing.RatedOn = date
 	}
 
-	updated, err := h.store.UpdateRequirement(r.Context(), existing)
+	updated, err := h.store.UpdateRequirement(r.Context(), driver.ID, existing)
 	if err != nil {
 		if errors.Is(err, repository.ErrNotFound) {
 			http.NotFound(w, r)
@@ -133,8 +152,8 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unable to save requirement", http.StatusInternalServerError)
 		return
 	}
-	slog.Info("requirement updated", "requirement", updated.Key, "status", updated.Status, "has_mastered_date", updated.MasteredDate != nil)
-	render(w, r, ui.RequirementRowWithMessage(updated, "Saved"))
+	slog.Info("requirement updated", "requirement", updated.Key, "status", updated.Rating, "has_rated_on", updated.RatedOn != nil)
+	render(w, r, ui.RequirementUpdate(updated, model.NewDashboard(driver, current.Profile, replaceRequirement(current.Requirements, updated), h.now())))
 }
 
 func parseHours(value string, max float64) (float64, error) {
@@ -161,4 +180,14 @@ func decimalPlaces(value string) int {
 		return 0
 	}
 	return len(parts[1])
+}
+
+func replaceRequirement(requirements []model.Requirement, updated model.Requirement) []model.Requirement {
+	for i, req := range requirements {
+		if req.Key == updated.Key {
+			requirements[i] = updated
+			break
+		}
+	}
+	return requirements
 }

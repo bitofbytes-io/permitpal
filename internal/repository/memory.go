@@ -8,61 +8,99 @@ import (
 	"github.com/drywaters/permitpal/internal/model"
 )
 
-type MemoryStore struct {
-	mu           sync.RWMutex
+type driverState struct {
+	driver       model.Driver
 	profile      model.Profile
 	requirements []model.Requirement
 }
-
-func NewMemoryStore(now time.Time) *MemoryStore {
-	return &MemoryStore{
-		profile:      model.DefaultProfile(now),
-		requirements: model.DefaultRequirements(now),
-	}
+type MemoryStore struct {
+	mu      sync.RWMutex
+	drivers map[string]*driverState
 }
 
-func (s *MemoryStore) GetDashboard(_ context.Context, now time.Time) (model.Dashboard, error) {
+func NewMemoryStore(_ time.Time) *MemoryStore {
+	return &MemoryStore{drivers: make(map[string]*driverState)}
+}
+func (s *MemoryStore) EnsureDriver(_ context.Context, username string, now time.Time) (model.Driver, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if state, ok := s.drivers[username]; ok {
+		return state.driver, nil
+	}
+	driver := model.NewDriver(username)
+	driver.ID = int64(len(s.drivers) + 1)
+	s.drivers[username] = &driverState{driver, model.NewDriverProfile(now), model.DefaultRequirements(now)}
+	return driver, nil
+}
+func (s *MemoryStore) DriverByUsername(_ context.Context, username string) (model.Driver, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	profile := s.profile
-	if s.profile.PermitIssueDate != nil {
-		issueDate := *s.profile.PermitIssueDate
-		profile.PermitIssueDate = &issueDate
+	if state, ok := s.drivers[username]; ok {
+		return state.driver, nil
 	}
-
-	requirements := make([]model.Requirement, len(s.requirements))
-	for idx := range s.requirements {
-		requirements[idx] = s.requirements[idx]
-		if s.requirements[idx].MasteredDate != nil {
-			masteredDate := *s.requirements[idx].MasteredDate
-			requirements[idx].MasteredDate = &masteredDate
+	return model.Driver{}, ErrNotFound
+}
+func (s *MemoryStore) stateByID(id int64) *driverState {
+	for _, state := range s.drivers {
+		if state.driver.ID == id {
+			return state
 		}
 	}
-	return model.NewDashboard(profile, requirements, now), nil
+	return nil
 }
-
-func (s *MemoryStore) UpdateProfile(_ context.Context, profile model.Profile) (model.Profile, error) {
+func copyProfile(profile model.Profile) model.Profile {
+	if profile.PermitIssueDate != nil {
+		date := *profile.PermitIssueDate
+		profile.PermitIssueDate = &date
+	}
+	return profile
+}
+func copyRequirement(req model.Requirement) model.Requirement {
+	if req.RatedOn != nil {
+		date := *req.RatedOn
+		req.RatedOn = &date
+	}
+	return req
+}
+func (s *MemoryStore) GetDashboard(_ context.Context, driver model.Driver, now time.Time) (model.Dashboard, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	state := s.stateByID(driver.ID)
+	if state == nil {
+		return model.Dashboard{}, ErrNotFound
+	}
+	requirements := make([]model.Requirement, len(state.requirements))
+	for i, req := range state.requirements {
+		requirements[i] = copyRequirement(req)
+	}
+	return model.NewDashboard(state.driver, copyProfile(state.profile), requirements, now), nil
+}
+func (s *MemoryStore) UpdateProfile(_ context.Context, driverID int64, profile model.Profile) (model.Profile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	state := s.stateByID(driverID)
+	if state == nil {
+		return model.Profile{}, ErrNotFound
+	}
 	profile.UpdatedAt = time.Now()
-	s.profile = profile
-	return s.profile, nil
+	state.profile = copyProfile(profile)
+	return copyProfile(profile), nil
 }
-
-func (s *MemoryStore) UpdateRequirement(_ context.Context, req model.Requirement) (model.Requirement, error) {
+func (s *MemoryStore) UpdateRequirement(_ context.Context, driverID int64, req model.Requirement) (model.Requirement, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	for idx, existing := range s.requirements {
+	state := s.stateByID(driverID)
+	if state == nil {
+		return model.Requirement{}, ErrNotFound
+	}
+	for i, existing := range state.requirements {
 		if existing.Key == req.Key {
 			req.Title = existing.Title
 			req.Description = existing.Description
 			req.SortOrder = existing.SortOrder
 			req.UpdatedAt = time.Now()
-			s.requirements[idx] = req
-			return req, nil
+			state.requirements[i] = copyRequirement(req)
+			return copyRequirement(req), nil
 		}
 	}
 	return model.Requirement{}, ErrNotFound

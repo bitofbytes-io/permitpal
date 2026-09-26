@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -16,6 +19,7 @@ const (
 )
 
 type Config struct {
+	Users           map[string]string
 	AppEnv          string
 	DataStore       string
 	LogLevel        string
@@ -55,6 +59,28 @@ func Load() (*Config, error) {
 	}
 	cfg.SessionCookie = getEnv("SESSION_COOKIE", "permitpal_session")
 	cfg.DefaultUsername = getEnv("PERMITPAL_USERNAME", "driver")
+	users, err := getEnvOrFile("PERMITPAL_USERS", "/run/secrets/permitpal_users")
+	if err != nil {
+		return nil, err
+	}
+	cfg.Users, err = parseUsers(users)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.PasswordHash != "" || cfg.Password != "" {
+		if !validUsername.MatchString(cfg.DefaultUsername) {
+			return nil, errors.New("PERMITPAL_USERNAME has an invalid username")
+		}
+		if _, exists := cfg.Users[cfg.DefaultUsername]; exists {
+			return nil, errors.New("duplicate username in legacy credential and PERMITPAL_USERS")
+		}
+		if cfg.PasswordHash != "" {
+			if !validBcrypt(cfg.PasswordHash) {
+				return nil, errors.New("PERMITPAL_PASSWORD_HASH must be a bcrypt hash")
+			}
+			cfg.Users[cfg.DefaultUsername] = cfg.PasswordHash
+		}
+	}
 	cfg.SecureCookies, err = parseBoolEnv("SECURE_COOKIES", defaultSecureCookies(cfg.AppEnv))
 	if err != nil {
 		return nil, err
@@ -68,16 +94,19 @@ func Load() (*Config, error) {
 	}
 
 	if cfg.AppEnv == "production" {
-		if cfg.PasswordHash == "" {
-			return nil, errors.New("PERMITPAL_PASSWORD_HASH is required in production")
+		if cfg.Password != "" {
+			return nil, errors.New("PERMITPAL_PASSWORD is not allowed in production")
+		}
+		if len(cfg.Users) == 0 {
+			return nil, errors.New("PERMITPAL_USERS or PERMITPAL_PASSWORD_HASH is required in production")
 		}
 		if cfg.SessionSecret == "" {
 			return nil, errors.New("SESSION_SECRET is required in production")
 		}
 	}
 
-	if cfg.Password == "" && cfg.PasswordHash == "" {
-		return nil, errors.New("PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required")
+	if cfg.Password == "" && len(cfg.Users) == 0 {
+		return nil, errors.New("PERMITPAL_USERS, PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required")
 	}
 	if cfg.SessionSecret == "" {
 		return nil, errors.New("SESSION_SECRET is required")
@@ -145,4 +174,36 @@ func readSecret(path, name string, allowMissing bool) (string, error) {
 		return "", fmt.Errorf("%s at %s is empty", name, path)
 	}
 	return value, nil
+}
+
+var validUsername = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+var bcryptEncoding = regexp.MustCompile(`^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$`)
+
+func validBcrypt(hash string) bool {
+	if !bcryptEncoding.MatchString(hash) {
+		return false
+	}
+	_, err := bcrypt.Cost([]byte(hash))
+	return err == nil
+}
+func parseUsers(value string) (map[string]string, error) {
+	users := make(map[string]string)
+	for _, line := range strings.Split(value, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		username, hash, ok := strings.Cut(line, ":")
+		if !ok || !validUsername.MatchString(username) {
+			return nil, errors.New("PERMITPAL_USERS contains an invalid username")
+		}
+		if _, exists := users[username]; exists {
+			return nil, fmt.Errorf("PERMITPAL_USERS contains duplicate username %q", username)
+		}
+		if !validBcrypt(hash) {
+			return nil, fmt.Errorf("PERMITPAL_USERS credential for %q must be a bcrypt hash", username)
+		}
+		users[username] = hash
+	}
+	return users, nil
 }

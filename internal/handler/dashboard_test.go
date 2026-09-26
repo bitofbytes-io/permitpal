@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
@@ -70,7 +71,13 @@ func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/profile", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	handler := NewDashboardHandler(repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)))
+	store := repository.NewMemoryStore(time.Now())
+	driver, err := store.EnsureDriver(context.Background(), "aiden", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req = req.WithContext(middleware.WithDriver(req.Context(), driver))
+	handler := NewDashboardHandler(store)
 
 	handler.UpdateProfile(rec, req)
 
@@ -108,14 +115,20 @@ func TestRequirementNotesLengthLimitCountsRunes(t *testing.T) {
 func updateRequirementWithNotes(t *testing.T, notes string) *httptest.ResponseRecorder {
 	t.Helper()
 	form := url.Values{
-		"status": {"needs_practice"},
+		"rating": {"fair"},
 		"notes":  {notes},
 	}
-	req := httptest.NewRequest(http.MethodPost, "/requirements/lane-changes", strings.NewReader(form.Encode()))
+	req := httptest.NewRequest(http.MethodPost, "/requirements/use-of-lane", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
 	router := chi.NewRouter()
-	handler := NewDashboardHandler(repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)))
+	store := repository.NewMemoryStore(time.Now())
+	driver, err := store.EnsureDriver(context.Background(), "aiden", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	req = req.WithContext(middleware.WithDriver(req.Context(), driver))
+	handler := NewDashboardHandler(store)
 	router.Post("/requirements/{key}", handler.UpdateRequirement)
 
 	router.ServeHTTP(rec, req)
