@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -16,23 +17,77 @@ import (
 )
 
 type Manager struct {
-	cfg *config.Config
+	cfg         *config.Config
+	dummyHashes map[int][]byte
+	costs       []int
 }
 
 func NewManager(cfg *config.Config) *Manager {
-	return &Manager{cfg: cfg}
-}
-
-func (m *Manager) CheckPassword(password string) bool {
-	if m.cfg.PasswordHash != "" {
-		return bcrypt.CompareHashAndPassword([]byte(m.cfg.PasswordHash), []byte(password)) == nil
+	dummyHashes := make(map[int][]byte)
+	for _, hash := range cfg.Users {
+		if cost, err := bcrypt.Cost([]byte(hash)); err == nil {
+			dummyHashes[cost] = nil
+		}
 	}
-	return subtle.ConstantTimeCompare([]byte(password), []byte(m.cfg.Password)) == 1
+	if cost, err := bcrypt.Cost([]byte(cfg.PasswordHash)); err == nil {
+		dummyHashes[cost] = nil
+	}
+	if len(dummyHashes) == 0 {
+		dummyHashes[bcrypt.DefaultCost] = nil
+	}
+	costs := make([]int, 0, len(dummyHashes))
+	for cost := range dummyHashes {
+		dummy, err := bcrypt.GenerateFromPassword([]byte("permitpal-unknown-user"), cost)
+		if err != nil {
+			panic(err)
+		}
+		dummyHashes[cost] = dummy
+		costs = append(costs, cost)
+	}
+	sort.Ints(costs)
+	return &Manager{cfg: cfg, dummyHashes: dummyHashes, costs: costs}
 }
 
-func (m *Manager) SetSession(w http.ResponseWriter) {
+func NormalizeUsername(username string) string { return strings.ToLower(strings.TrimSpace(username)) }
+func (m *Manager) hasUser(username string) bool {
+	_, ok := m.cfg.Users[username]
+	return ok || (username == m.cfg.DefaultUsername && (m.cfg.PasswordHash != "" || m.cfg.Password != ""))
+}
+func (m *Manager) CheckCredentials(username, password string) bool {
+	return m.checkCredentials(username, password, bcrypt.CompareHashAndPassword)
+}
+
+func (m *Manager) checkCredentials(username, password string, compare func([]byte, []byte) error) bool {
+	username = NormalizeUsername(username)
+	hash := m.cfg.Users[username]
+	matched := false
+	if hash == "" && username == m.cfg.DefaultUsername {
+		hash = m.cfg.PasswordHash
+		if hash == "" && m.cfg.Password != "" {
+			matched = subtle.ConstantTimeCompare([]byte(password), []byte(m.cfg.Password)) == 1
+		}
+	}
+	realCost, err := bcrypt.Cost([]byte(hash))
+	hasHash := hash != "" && err == nil
+	// Compare once at every configured cost, even after a match. Mixed-cost
+	// credential files must not expose usernames through different bcrypt work.
+	for _, cost := range m.costs {
+		candidate := m.dummyHashes[cost]
+		isReal := hasHash && cost == realCost
+		if isReal {
+			candidate = []byte(hash)
+		}
+		err := compare(candidate, []byte(password))
+		if isReal && err == nil {
+			matched = true
+		}
+	}
+	return matched
+}
+
+func (m *Manager) SetSession(w http.ResponseWriter, username string) {
 	expires := time.Now().Add(30 * 24 * time.Hour)
-	payload := fmt.Sprintf("%s:%d", m.cfg.DefaultUsername, expires.Unix())
+	payload := fmt.Sprintf("%s:%d", NormalizeUsername(username), expires.Unix())
 	signature := m.sign(payload)
 	value := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + signature
 
@@ -59,39 +114,54 @@ func (m *Manager) ClearSession(w http.ResponseWriter) {
 	})
 }
 
-func (m *Manager) Authenticated(r *http.Request) bool {
+func (m *Manager) SessionUsername(r *http.Request) (string, bool) {
 	cookie, err := r.Cookie(m.cfg.SessionCookie)
 	if err != nil || cookie.Value == "" {
-		return false
+		return "", false
 	}
 
 	parts := strings.Split(cookie.Value, ".")
 	if len(parts) != 2 {
-		return false
+		return "", false
 	}
 
 	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return false
+		return "", false
 	}
 	payload := string(payloadBytes)
 	if !hmac.Equal([]byte(parts[1]), []byte(m.sign(payload))) {
-		return false
+		return "", false
 	}
 
 	payloadParts := strings.Split(payload, ":")
 	if len(payloadParts) != 2 {
-		return false
+		return "", false
 	}
 	expiresUnix, err := strconv.ParseInt(payloadParts[1], 10, 64)
 	if err != nil {
-		return false
+		return "", false
 	}
-	return time.Now().Before(time.Unix(expiresUnix, 0))
+	if !m.hasUser(payloadParts[0]) || !time.Now().Before(time.Unix(expiresUnix, 0)) {
+		return "", false
+	}
+	return payloadParts[0], true
 }
 
 func (m *Manager) sign(payload string) string {
 	mac := hmac.New(sha256.New, []byte(m.cfg.SessionSecret))
 	_, _ = mac.Write([]byte(payload))
+	username, _, _ := strings.Cut(payload, ":")
+	credential := m.cfg.Users[username]
+	if credential == "" && username == m.cfg.DefaultUsername {
+		credential = m.cfg.PasswordHash
+		if credential == "" {
+			credential = m.cfg.Password
+		}
+	}
+	// Keep the public payload unchanged while revoking cookies after a credential
+	// replacement, including removing and later recreating the same username.
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(credential))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

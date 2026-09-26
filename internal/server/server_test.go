@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/drywaters/permitpal/internal/config"
+	"github.com/drywaters/permitpal/internal/model"
 	"github.com/drywaters/permitpal/internal/repository"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestUnauthenticatedUserSeesLogin(t *testing.T) {
@@ -37,26 +39,26 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.Jar = jar
-	loginForm := url.Values{"password": {"test-password"}}
+	loginForm := url.Values{"username": {"aiden"}, "password": {"test-password"}}
 	res := doPostForm(t, client, ts.URL+"/login", loginForm)
 	closeBody(t, res)
 
 	res = doGet(t, client, ts.URL+"/")
 	body := readBody(t, res)
-	if !strings.Contains(body, "Skill Mastery Checklist") || !strings.Contains(body, "Lane changes") {
+	if !strings.Contains(body, "Road Test Skill Checklist") || !strings.Contains(body, "Use of lane") {
 		t.Fatalf("dashboard missing checklist content: %s", body)
 	}
 	assertDecimalHourInput(t, body, "total_hours", `(60(\.0)?|[0-5]?[0-9](\.[0-9])?|\.[0-9])`)
 	assertDecimalHourInput(t, body, "night_hours", `(10(\.0)?|[0-9](\.[0-9])?|\.[0-9])`)
 
 	update := url.Values{
-		"status":        {"mastered"},
-		"mastered_date": {"2026-05-02"},
-		"notes":         {"Clean mirror checks."},
+		"rating":   {"good"},
+		"rated_on": {"2026-05-02"},
+		"notes":    {"Clean mirror checks."},
 	}
-	res = doPostForm(t, client, ts.URL+"/requirements/lane-changes", update)
+	res = doPostForm(t, client, ts.URL+"/requirements/use-of-lane", update)
 	row := readBody(t, res)
-	if !strings.Contains(row, "Mastered") || !strings.Contains(row, "Clean mirror checks.") {
+	if !strings.Contains(row, "Good") || !strings.Contains(row, "Clean mirror checks.") {
 		t.Fatalf("requirement partial missing updated content: %s", row)
 	}
 
@@ -75,16 +77,26 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := &config.Config{
-		AppEnv:          "development",
-		DataStore:       config.DataStoreMemory,
-		Port:            "4600",
-		Password:        "test-password",
-		SessionSecret:   "test-session-secret-32-chars-ok",
-		SessionCookie:   "permitpal_session",
-		DefaultUsername: "driver",
+		Users:         map[string]string{"aiden": string(hash), "caleb": string(hash)},
+		AppEnv:        "development",
+		DataStore:     config.DataStoreMemory,
+		Port:          "4600",
+		SessionSecret: "test-session-secret-32-chars-ok",
+		SessionCookie: "permitpal_session",
 	}
 	store := repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
+	caleb, err := store.EnsureDriver(context.Background(), "caleb", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.UpdateProfile(context.Background(), caleb.ID, model.Profile{TotalHours: 56, NightHours: 8}); err != nil {
+		t.Fatal(err)
+	}
 	app := New(cfg, store, slog.Default())
 	return httptest.NewServer(app.Router())
 }
@@ -171,4 +183,31 @@ func inputTagByID(t *testing.T, body, id string) string {
 		t.Fatalf("input %s tag could not be extracted from body: %s", id, body)
 	}
 	return body[start : idIndex+end+1]
+}
+
+func TestSeparateLoginsAndInvalidCredentials(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+	client := ts.Client()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Jar = jar
+	for _, username := range []string{"aiden", "missing"} {
+		body := readBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {username}, "password": {"wrong"}}))
+		if !strings.Contains(body, "That username and password did not match.") || !strings.Contains(body, `value="`+username+`"`) {
+			t.Fatal("invalid credentials should retain username and show neutral error")
+		}
+	}
+	body := readBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {" AIDEN "}, "password": {"test-password"}}))
+	if !strings.Contains(body, "Welcome back, Aiden!") || !strings.Contains(body, "0.0 total hours") || strings.Count(body, `class="row-number"`) != 17 {
+		t.Fatal("Aiden should have a fresh 17-skill tracker")
+	}
+	closeBody(t, doPostForm(t, client, ts.URL+"/profile", url.Values{"total_hours": {"20"}, "night_hours": {"2"}}))
+	closeBody(t, doPostForm(t, client, ts.URL+"/logout", nil))
+	body = readBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"caleb"}, "password": {"test-password"}}))
+	if !strings.Contains(body, "Welcome back, Caleb!") || !strings.Contains(body, "56.0 total hours") || !strings.Contains(body, "8.0 night hours") {
+		t.Fatal("Caleb lost existing progress")
+	}
 }

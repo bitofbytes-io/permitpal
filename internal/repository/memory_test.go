@@ -2,79 +2,71 @@ package repository
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/drywaters/permitpal/internal/model"
 )
 
-func TestMemoryStoreSeedsDashboardAndUpdatesRequirement(t *testing.T) {
-	store := NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
-
-	dashboard, err := store.GetDashboard(context.Background(), time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
+func TestMemoryDriversAreIsolatedAndIdempotent(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	store := NewMemoryStore(now)
+	aiden, err := store.EnsureDriver(ctx, "aiden", now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(dashboard.Requirements) != 13 {
-		t.Fatalf("len(requirements) = %d, want 13", len(dashboard.Requirements))
-	}
-
-	req, ok := model.RequirementByKey(dashboard.Requirements, "lane-changes")
-	if !ok {
-		t.Fatal("missing lane-changes requirement")
-	}
-	req.Status = model.StatusMastered
-	mastered := time.Date(2026, 5, 2, 0, 0, 0, 0, time.Local)
-	req.MasteredDate = &mastered
-	req.Notes = "Clean mirror checks."
-
-	updated, err := store.UpdateRequirement(context.Background(), req)
+	caleb, err := store.EnsureDriver(ctx, "caleb", now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.Status != model.StatusMastered || updated.MasteredDate == nil {
-		t.Fatalf("updated requirement = %#v, want mastered with date", updated)
+	before, _ := store.GetDashboard(ctx, caleb, now)
+	again, _ := store.EnsureDriver(ctx, "aiden", now)
+	if again != aiden {
+		t.Fatal("EnsureDriver changed driver")
 	}
-}
-
-func TestMemoryStoreUpdatesProfile(t *testing.T) {
-	store := NewMemoryStore(time.Now())
-	profile := model.Profile{TotalHours: 42, NightHours: 8}
-
-	updated, err := store.UpdateProfile(context.Background(), profile)
+	dash, _ := store.GetDashboard(ctx, aiden, now)
+	if len(dash.Requirements) != 17 || dash.Profile.TotalHours != 0 || dash.Profile.PermitIssueDate != nil {
+		t.Fatalf("new dashboard: %+v", dash)
+	}
+	date := now
+	profile := model.Profile{TotalHours: 12, NightHours: 2, PermitIssueDate: &date}
+	saved, err := store.UpdateProfile(ctx, aiden.ID, profile)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.TotalHours != 42 || updated.NightHours != 8 {
-		t.Fatalf("updated profile = %#v", updated)
-	}
-}
-
-func TestMemoryStoreDashboardDoesNotShareDatePointers(t *testing.T) {
-	store := NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
-	dashboard, err := store.GetDashboard(context.Background(), time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
+	req := dash.Requirements[0]
+	req.Rating = model.RatingBad
+	req.RatedOn = &date
+	req.Notes = "Practice"
+	savedReq, err := store.UpdateRequirement(ctx, aiden.ID, req)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	*dashboard.Profile.PermitIssueDate = time.Date(1999, 1, 1, 0, 0, 0, 0, time.Local)
-	for idx := range dashboard.Requirements {
-		if dashboard.Requirements[idx].MasteredDate != nil {
-			*dashboard.Requirements[idx].MasteredDate = time.Date(1999, 1, 1, 0, 0, 0, 0, time.Local)
-			break
-		}
+	*saved.PermitIssueDate = time.Time{}
+	*savedReq.RatedOn = time.Time{}
+	date = time.Time{}
+	dash, _ = store.GetDashboard(ctx, aiden, now)
+	if dash.Profile.PermitIssueDate.IsZero() || dash.Requirements[0].RatedOn.IsZero() {
+		t.Fatal("write results or arguments share date pointers")
 	}
-
-	next, err := store.GetDashboard(context.Background(), time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
-	if err != nil {
-		t.Fatal(err)
+	*dash.Profile.PermitIssueDate = time.Time{}
+	*dash.Requirements[0].RatedOn = time.Time{}
+	next, _ := store.GetDashboard(ctx, aiden, now)
+	if next.Profile.PermitIssueDate.IsZero() || next.Requirements[0].RatedOn.IsZero() {
+		t.Fatal("dashboard shares date pointers")
 	}
-	if next.Profile.PermitIssueDate.Year() == 1999 {
-		t.Fatal("profile permit issue date shared pointer state")
+	after, _ := store.GetDashboard(ctx, caleb, now)
+	if !reflect.DeepEqual(before, after) {
+		t.Fatal("Aiden changed Caleb data")
 	}
-	for _, req := range next.Requirements {
-		if req.MasteredDate != nil && req.MasteredDate.Year() == 1999 {
-			t.Fatal("requirement mastered date shared pointer state")
-		}
+	again, _ = store.EnsureDriver(ctx, "aiden", now)
+	next, _ = store.GetDashboard(ctx, again, now)
+	if next.Profile.TotalHours != 12 || next.Requirements[0].Notes != "Practice" {
+		t.Fatal("login reset saved data")
+	}
+	if _, err := store.DriverByUsername(ctx, "missing"); err != ErrNotFound {
+		t.Fatalf("missing driver: %v", err)
 	}
 }

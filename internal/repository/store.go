@@ -11,9 +11,11 @@ import (
 )
 
 type Store interface {
-	GetDashboard(ctx context.Context, now time.Time) (model.Dashboard, error)
-	UpdateProfile(ctx context.Context, profile model.Profile) (model.Profile, error)
-	UpdateRequirement(ctx context.Context, req model.Requirement) (model.Requirement, error)
+	EnsureDriver(ctx context.Context, username string, now time.Time) (model.Driver, error)
+	DriverByUsername(ctx context.Context, username string) (model.Driver, error)
+	GetDashboard(ctx context.Context, driver model.Driver, now time.Time) (model.Dashboard, error)
+	UpdateProfile(ctx context.Context, driverID int64, profile model.Profile) (model.Profile, error)
+	UpdateRequirement(ctx context.Context, driverID int64, req model.Requirement) (model.Requirement, error)
 }
 
 type CloseFunc func()

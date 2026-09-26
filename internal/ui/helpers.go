@@ -10,11 +10,13 @@ func progressStyle(percent int) string {
 	return fmt.Sprintf("--progress:%d%%", percent)
 }
 
-func requirementRowClass(status model.RequirementStatus) string {
-	if status == model.StatusMastered {
-		return "skill-row skill-row--mastered"
+func requirementRowClass(rating model.RequirementRating) string {
+	switch rating {
+	case model.RatingBad, model.RatingFair, model.RatingGood:
+		return "skill-row skill-row--" + string(rating)
+	default:
+		return "skill-row"
 	}
-	return "skill-row"
 }
 
 func odometerChars(value float64) []string {
