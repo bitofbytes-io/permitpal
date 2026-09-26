@@ -44,7 +44,7 @@ PORT=4600
 SECURE_COOKIES=true
 ```
 
-For users-file-only deployments, remove the old secret mount at `/run/secrets/permitpal_password_hash` and clear `PERMITPAL_PASSWORD_HASH`, `PERMITPAL_PASSWORD_HASH_FILE`, `PERMITPAL_PASSWORD`, and `PERMITPAL_PASSWORD_FILE`. Clearing the hash file variable alone still allows the optional default file to load if it remains mounted. Remove the legacy `PERMITPAL_USERNAME` setting too; usernames come from the users file. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
+For users-file-only deployments, remove the old secret mount at `/run/secrets/permitpal_password_hash` and clear `PERMITPAL_PASSWORD_HASH`, `PERMITPAL_PASSWORD_HASH_FILE`, `PERMITPAL_PASSWORD`, and `PERMITPAL_PASSWORD_FILE`. An explicitly empty `*_FILE` setting disables the default file fallback; an unset setting allows the optional default file to load. Remove the legacy `PERMITPAL_USERNAME` setting too; usernames come from the users file. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
 
 | Setting | Required | Purpose |
 | --- | --- | --- |

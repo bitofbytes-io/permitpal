@@ -152,7 +152,10 @@ func getEnvOrFile(key, defaultPath string) (string, error) {
 	if value := os.Getenv(key); value != "" {
 		return strings.TrimSpace(value), nil
 	}
-	if path := os.Getenv(key + "_FILE"); path != "" {
+	if path, explicit := os.LookupEnv(key + "_FILE"); explicit {
+		if path == "" {
+			return "", nil
+		}
 		return readSecret(path, key+"_FILE", false)
 	}
 	if defaultPath != "" {

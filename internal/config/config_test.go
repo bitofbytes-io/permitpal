@@ -176,3 +176,42 @@ func TestUsersValidation(t *testing.T) {
 		t.Fatalf("duplicate legacy error: %v", err)
 	}
 }
+
+func TestSecretFileSelection(t *testing.T) {
+	const key = "PERMITPAL_PASSWORD_HASH"
+	defaultPath := filepath.Join(t.TempDir(), "default-hash")
+	explicitPath := filepath.Join(t.TempDir(), "explicit-hash")
+	if err := os.WriteFile(defaultPath, []byte("default-hash"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(explicitPath, []byte("explicit-hash"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, direct, path, want string
+		fileSet, wantErr         bool
+	}{
+		{name: "unset uses default", want: "default-hash"},
+		{name: "explicit empty disables default", fileSet: true},
+		{name: "explicit file overrides default", fileSet: true, path: explicitPath, want: "explicit-hash"},
+		{name: "missing explicit file errors", fileSet: true, path: filepath.Join(t.TempDir(), "missing"), wantErr: true},
+		{name: "direct value wins over file", direct: "direct-hash", fileSet: true, path: explicitPath, want: "direct-hash"},
+		{name: "direct value wins over disabled file", direct: "direct-hash", fileSet: true, want: "direct-hash"},
+		{name: "direct value wins over missing file", direct: "direct-hash", fileSet: true, path: filepath.Join(t.TempDir(), "missing"), want: "direct-hash"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(key, test.direct)
+			// Setenv registers restoration even when this case needs a genuinely unset key.
+			t.Setenv(key+"_FILE", test.path)
+			if !test.fileSet {
+				if err := os.Unsetenv(key + "_FILE"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := getEnvOrFile(key, defaultPath)
+			if (err != nil) != test.wantErr || got != test.want {
+				t.Fatalf("got %q, %v; want %q, error=%v", got, err, test.want, test.wantErr)
+			}
+		})
+	}
+}
