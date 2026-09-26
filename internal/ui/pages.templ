@@ -242,7 +242,7 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 			<input name="rated_on" type="date" value={ model.DateValue(req.RatedOn) }/>
 		</label>
 		<label class="notes-field">
-			<span class="sr-only">Practice notes</span>
+			<span class="sr-only">Notes</span>
 			<input name="notes" value={ req.Notes }/>
 		</label>
 		<button class="row-save" type="submit" aria-label={ "Update " + req.Title }>
