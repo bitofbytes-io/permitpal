@@ -666,6 +666,7 @@ input {
 }
 .date-field, .notes-field {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   padding: 4px 6px;
   min-width: 0;
@@ -683,11 +684,16 @@ input {
   background: rgba(255, 255, 255, 0.64);
 }
 .date-field input {
+  display: block;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   min-inline-size: 0;
   padding-right: 4px;
   overflow: hidden;
+  line-height: 1.2;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .date-field input::-webkit-date-and-time-value {
   min-width: 0;
@@ -911,6 +917,105 @@ input {
   .clipboard-shell {
     padding: 86px 8px 10px;
     border-width: 7px;
+  }
+  .checklist-table {
+    contain: none;
+    overflow-x: visible;
+  }
+  .checklist-head {
+    display: none;
+  }
+  .checklist-row {
+    grid-template-columns: 30px repeat(6, minmax(0, 1fr));
+    grid-template-areas: "num title title title title title title" "num bad bad fair fair good good" "num date date date date date date" "num notes notes notes notes save save";
+    width: 100%;
+    border-bottom: 1px solid var(--table-line);
+  }
+  .checklist-row > * {
+    border-right: 0;
+    border-bottom: 0;
+  }
+  .checklist-row .row-number {
+    grid-area: num;
+    border-right: 1px solid var(--table-line);
+  }
+  .checklist-row .skill-title {
+    grid-area: title;
+    padding: 8px 8px 2px;
+  }
+  .status-cell--bad {
+    grid-area: bad;
+  }
+  .status-cell--fair {
+    grid-area: fair;
+  }
+  .status-cell--good {
+    grid-area: good;
+  }
+  .checklist-row .status-cell {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    min-height: 40px;
+  }
+  .checklist-row .date-field {
+    grid-area: date;
+  }
+  .checklist-row .notes-field {
+    grid-area: notes;
+  }
+  .checklist-row .date-field, .checklist-row .notes-field {
+    gap: 2px;
+    align-content: end;
+    padding: 0 4px 8px 8px;
+  }
+  .checklist-row .date-field {
+    padding-bottom: 4px;
+  }
+  .checklist-row .status-cell .sr-only, .checklist-row .date-field .sr-only, .checklist-row .notes-field .sr-only {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+  .checklist-row .status-cell .sr-only {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .status-cell--bad .sr-only {
+    color: var(--brake);
+  }
+  .status-cell--fair .sr-only {
+    color: #926000;
+  }
+  .status-cell--good .sr-only {
+    color: var(--sign);
+  }
+  .checklist-row .date-field .sr-only, .checklist-row .notes-field .sr-only {
+    color: #514b43;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .checklist-row .date-field input, .checklist-row .notes-field input {
+    min-height: 36px;
+  }
+  .checklist-row .row-save {
+    grid-area: save;
+    align-self: end;
+    min-height: 36px;
+    height: 36px;
+    margin-bottom: 8px;
+    border: 0;
+  }
+  .checklist-row .row-save::before {
+    inset: 0 4px;
   }
   .checklist-reference {
     position: static;
