@@ -325,3 +325,51 @@ func TestConcurrentEnsureDriver(t *testing.T) {
 		})
 	}
 }
+
+func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
+	for _, backend := range []string{"memory", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			now := time.Now()
+			ctx := context.Background()
+			store := validationStore(t, backend, now)
+			driver, err := store.EnsureDriver(ctx, "aiden", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			handler := NewDashboardHandler(store)
+			router := chi.NewRouter()
+			router.Post("/requirements/{key}", handler.UpdateRequirement)
+			submit := func(form url.Values) *httptest.ResponseRecorder {
+				req := httptest.NewRequest("POST", "/requirements/quick-stop", strings.NewReader(form.Encode()))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req = req.WithContext(middleware.WithDriver(req.Context(), driver))
+				rec := httptest.NewRecorder()
+				router.ServeHTTP(rec, req)
+				return rec
+			}
+			form := url.Values{"rating": {"good"}, "rated_on": {"2026-05-01"}, "notes": {"Keep this practice note"}}
+			if rec := submit(form); rec.Code != 200 {
+				t.Fatal(rec.Body.String())
+			}
+			form.Set("clear_rating", "true")
+			rec := submit(form)
+			if rec.Code != 200 {
+				t.Fatal(rec.Body.String())
+			}
+			dash, err := store.GetDashboard(ctx, driver, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req := dash.Requirements[0]
+			if req.Rating != model.RatingNotRated || req.RatedOn != nil || req.Notes != "Keep this practice note" {
+				t.Fatalf("cleared requirement=%+v", req)
+			}
+			if len(dash.PracticeFocus) == 0 || dash.PracticeFocus[0].Key != "quick-stop" {
+				t.Fatal("clear did not restore practice focus")
+			}
+			if strings.Contains(rec.Body.String(), `checked`) || !strings.Contains(rec.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(rec.Body.String(), "Clear rating for Quick stop") {
+				t.Fatal("clear response did not reset selection and refresh focus")
+			}
+		})
+	}
+}

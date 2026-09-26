@@ -995,3 +995,19 @@ input {
 .checklist-head span:nth-child(5) {
   color: var(--sign);
 }
+.clear-rating {
+  min-height: 24px;
+  margin-top: 3px;
+  padding: 2px 0;
+  border: 0;
+  color: #514b43;
+  font-size: 0.68rem;
+  font-weight: 400;
+  text-decoration: underline;
+  background: transparent;
+  box-shadow: none;
+}
+.clear-rating:hover {
+  color: #1f3324;
+  background: transparent;
+}

@@ -222,6 +222,8 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 		<div class="skill-title">
 			<h3>{ req.Title }</h3>
 <p class="skill-description">{ req.Description }</p>
+            <button class="clear-rating" type="button" aria-label={ "Clear rating for " + req.Title }
+                hx-post={ "/requirements/" + req.Key } hx-include="closest form" hx-vals='{"clear_rating":"true"}'>Clear rating</button>
 		</div>
         <label class="status-cell status-cell--bad">
             <span class="sr-only">Bad</span>

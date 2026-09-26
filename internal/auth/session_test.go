@@ -118,3 +118,56 @@ func TestMixedCostCredentialsUseSameWorkload(t *testing.T) {
 		})
 	}
 }
+
+func TestCredentialReplacementRevokesExistingSessions(t *testing.T) {
+	firstHash, err := bcrypt.GenerateFromPassword([]byte("first-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextHash, err := bcrypt.GenerateFromPassword([]byte("next-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"users", "legacy-hash", "legacy-plaintext"} {
+		t.Run(kind, func(t *testing.T) {
+			cfg := &config.Config{DefaultUsername: "aiden", SessionCookie: "session", SessionSecret: "a-session-secret-that-is-at-least-32-characters"}
+			replace := func(next bool) {
+				hash, password := string(firstHash), "first-password"
+				if next {
+					hash, password = string(nextHash), "next-password"
+				}
+				switch kind {
+				case "users":
+					cfg.Users = map[string]string{"aiden": hash}
+				case "legacy-hash":
+					cfg.PasswordHash = hash
+				case "legacy-plaintext":
+					cfg.Password = password
+				}
+			}
+			replace(false)
+			manager := NewManager(cfg)
+			requestWithCookie := func(username string) *http.Request {
+				rec := httptest.NewRecorder()
+				manager.SetSession(rec, username)
+				req := httptest.NewRequest("GET", "/", nil)
+				req.AddCookie(rec.Result().Cookies()[0])
+				return req
+			}
+			oldRequest := requestWithCookie("aiden")
+			if _, ok := manager.SessionUsername(oldRequest); !ok {
+				t.Fatal("initial cookie rejected")
+			}
+			replace(true)
+			if _, ok := manager.SessionUsername(oldRequest); ok {
+				t.Fatal("old cookie accepted after credential replacement")
+			}
+			if _, ok := manager.SessionUsername(requestWithCookie("aiden")); !ok {
+				t.Fatal("new cookie rejected")
+			}
+			if _, ok := manager.SessionUsername(requestWithCookie("unknown")); ok {
+				t.Fatal("unknown user cookie accepted")
+			}
+		})
+	}
+}

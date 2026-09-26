@@ -151,5 +151,17 @@ func (m *Manager) SessionUsername(r *http.Request) (string, bool) {
 func (m *Manager) sign(payload string) string {
 	mac := hmac.New(sha256.New, []byte(m.cfg.SessionSecret))
 	_, _ = mac.Write([]byte(payload))
+	username, _, _ := strings.Cut(payload, ":")
+	credential := m.cfg.Users[username]
+	if credential == "" && username == m.cfg.DefaultUsername {
+		credential = m.cfg.PasswordHash
+		if credential == "" {
+			credential = m.cfg.Password
+		}
+	}
+	// Keep the public payload unchanged while revoking cookies after a credential
+	// replacement, including removing and later recreating the same username.
+	_, _ = mac.Write([]byte{0})
+	_, _ = mac.Write([]byte(credential))
 	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

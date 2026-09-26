@@ -106,7 +106,11 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Unable to read requirement form", http.StatusBadRequest)
 		return
 	}
-	rating, ok := model.ParseRating(r.FormValue("rating"))
+	ratingValue := r.FormValue("rating")
+	if r.FormValue("clear_rating") == "true" {
+		ratingValue = string(model.RatingNotRated)
+	}
+	rating, ok := model.ParseRating(ratingValue)
 	if !ok {
 		http.Error(w, "Rating must be not_rated, bad, fair, or good", http.StatusBadRequest)
 		return
