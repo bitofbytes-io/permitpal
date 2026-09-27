@@ -27,6 +27,25 @@ func TestUnauthenticatedUserSeesLogin(t *testing.T) {
 	if !strings.Contains(body, "PermitPal") || !strings.Contains(body, "Sign in") {
 		t.Fatalf("login page did not render expected copy: %s", body)
 	}
+	// The splash lives on the root so Safari's keyboard and overscroll areas never show the page color.
+	if !strings.Contains(body, `<html lang="en" class="login-page">`) {
+		t.Fatalf("login page root is missing the login-page class: %s", body)
+	}
+	username := strings.Index(body, `id="username"`)
+	password := strings.Index(body, `id="password"`)
+	if username < 0 || password < 0 || username > password {
+		t.Fatalf("login form must render username before password: %s", body)
+	}
+	// Password managers insert a focusable button in the username field; Tab must skip it.
+	for _, want := range []string{
+		`document.getElementById("username").addEventListener("keydown"`,
+		`event.key === "Tab" && !event.shiftKey`,
+		`document.getElementById("password").focus()`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("login page is missing the username Tab handler %q: %s", want, body)
+		}
+	}
 }
 
 func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {

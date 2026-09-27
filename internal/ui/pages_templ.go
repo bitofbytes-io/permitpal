@@ -36,7 +36,7 @@ func LoginPage(errorMessage, username string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>PermitPal</title><link rel=\"icon\" href=\"/static/assets/permitpal-logo-mark.png\"><link rel=\"stylesheet\" href=\"/static/styles.css\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"login-page\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>PermitPal</title><link rel=\"icon\" href=\"/static/assets/permitpal-logo-mark.png\"><link rel=\"stylesheet\" href=\"/static/styles.css\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -80,7 +80,7 @@ func LoginPage(errorMessage, username string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" autofocus> <label for=\"password\">Password</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" placeholder=\"Enter your password\"> <button type=\"submit\">Sign in</button></form></section></main></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" autofocus> <label for=\"password\">Password</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" placeholder=\"Enter your password\"> <button type=\"submit\">Sign in</button></form></section></main><script>\n\t\t\t\t// Password managers such as 1Password insert a focusable button inside the\n\t\t\t\t// username field, so Tab would stop there instead of reaching the password.\n\t\t\t\tdocument.getElementById(\"username\").addEventListener(\"keydown\", function (event) {\n\t\t\t\t\tif (event.key === \"Tab\" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {\n\t\t\t\t\t\tevent.preventDefault();\n\t\t\t\t\t\tdocument.getElementById(\"password\").focus();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -124,7 +124,7 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(dashboard.Driver.DisplayName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 61, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 71, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -145,7 +145,7 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(dashboard.Profile.TotalHours))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 76, Col: 268}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 86, Col: 268}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -158,7 +158,7 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(dashboard.Profile.NightHours))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 81, Col: 262}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 91, Col: 262}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -171,7 +171,7 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(model.DateValue(dashboard.Profile.PermitIssueDate))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 85, Col: 134}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 95, Col: 134}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -289,7 +289,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(dashboard.Profile.TotalHours) + " total hours")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 156, Col: 103}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 166, Col: 103}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -313,7 +313,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(char)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 161, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 171, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -332,7 +332,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(progressStyle(dashboard.TotalPercent))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 167, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 177, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -345,7 +345,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(dashboard.Profile.TotalHours))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 169, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 179, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -358,7 +358,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(dashboard.Profile.NightHours) + " night hours")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 175, Col: 103}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 185, Col: 103}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -382,7 +382,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(char)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 180, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 190, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -401,7 +401,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(progressStyle(dashboard.NightPercent))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 186, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 196, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -414,7 +414,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(dashboard.Profile.NightHours))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 188, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 198, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -432,7 +432,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(estimatePrefix)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 196, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 206, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -445,7 +445,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(estimateDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 197, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 207, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -463,7 +463,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(dashboard.ReadyEstimate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 199, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 209, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -486,7 +486,7 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(savedMessage)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 203, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 213, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -567,7 +567,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs("requirement-" + req.Key)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 215, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 225, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -593,7 +593,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs("/requirements/" + req.Key)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 217, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 227, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -606,7 +606,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs("#requirement-" + req.Key)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 218, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 228, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -619,7 +619,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", req.SortOrder))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 221, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 231, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -632,7 +632,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var32 string
 		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(req.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 223, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 233, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
@@ -645,7 +645,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(req.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 224, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 234, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -658,7 +658,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs("Clear rating for " + req.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 225, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 235, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -671,7 +671,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs("/requirements/" + req.Key)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 226, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 236, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -714,7 +714,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(model.DateValue(req.RatedOn))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 242, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 252, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -727,7 +727,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(req.Notes)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 246, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 256, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -740,7 +740,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs("Update " + req.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 248, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 258, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -758,7 +758,7 @@ func RequirementRowWithMessage(req model.Requirement, savedMessage string) templ
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(savedMessage)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 250, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 260, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 			if templ_7745c5c3_Err != nil {
@@ -825,7 +825,7 @@ func PracticeFocus(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(req.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 271, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/pages.templ`, Line: 281, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 			if templ_7745c5c3_Err != nil {
