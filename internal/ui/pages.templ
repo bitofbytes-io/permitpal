@@ -9,7 +9,7 @@ import (
 
 templ LoginPage(errorMessage, username string) {
 	<!doctype html>
-	<html lang="en">
+	<html lang="en" class="login-page">
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
@@ -35,6 +35,16 @@ templ LoginPage(errorMessage, username string) {
 					</form>
 				</section>
 			</main>
+			<script>
+				// Password managers such as 1Password insert a focusable button inside the
+				// username field, so Tab would stop there instead of reaching the password.
+				document.getElementById("username").addEventListener("keydown", function (event) {
+					if (event.key === "Tab" && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+						event.preventDefault();
+						document.getElementById("password").focus();
+					}
+				});
+			</script>
 		</body>
 	</html>
 }
