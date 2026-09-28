@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
@@ -96,6 +98,11 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return httptest.NewServer(newTestApp(t).Router())
+}
+
+func newTestApp(t *testing.T) *Server {
+	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +114,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 		Port:          "4600",
 		SessionSecret: "test-session-secret-32-chars-ok",
 		SessionCookie: "permitpal_session",
+		Location:      time.Local,
 	}
 	store := repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
 	caleb, err := store.EnsureDriver(context.Background(), "caleb", time.Now())
@@ -116,8 +124,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	if _, err := store.UpdateProfile(context.Background(), caleb.ID, model.Profile{TotalHours: 56, NightHours: 8}); err != nil {
 		t.Fatal(err)
 	}
-	app := New(cfg, store, slog.Default())
-	return httptest.NewServer(app.Router())
+	return New(cfg, store, slog.Default())
 }
 
 func doGet(t *testing.T, client *http.Client, url string) *http.Response {
@@ -229,4 +236,83 @@ func TestSeparateLoginsAndInvalidCredentials(t *testing.T) {
 	if !strings.Contains(body, "Welcome back, Caleb!") || !strings.Contains(body, "56.0 total hours") || !strings.Contains(body, "8.0 night hours") {
 		t.Fatal("Caleb lost existing progress")
 	}
+}
+
+func TestLoginRateLimits(t *testing.T) {
+	proxies := []netip.Prefix{netip.MustParsePrefix("10.0.1.0/24")}
+	newLogin := func(t *testing.T, trusted []netip.Prefix) func(remoteAddr, forwardedFor, username, password string) *httptest.ResponseRecorder {
+		app := newTestApp(t)
+		app.cfg.TrustedProxies = trusted
+		router := app.Router()
+		return func(remoteAddr, forwardedFor, username, password string) *httptest.ResponseRecorder {
+			t.Helper()
+			form := url.Values{"username": {username}, "password": {password}}
+			req := httptest.NewRequest(http.MethodPost, "http://permitpal.test/login", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Origin", "http://permitpal.test")
+			req.RemoteAddr = remoteAddr
+			if forwardedFor != "" {
+				req.Header.Set("X-Forwarded-For", forwardedFor)
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			return rec
+		}
+	}
+	// failFromOneIP spends the per-IP budget using a different username each time.
+	failFromOneIP := func(t *testing.T, login func(string, string, string, string) *httptest.ResponseRecorder, remoteAddr string, forwardedFor func(int) string) {
+		t.Helper()
+		for i := range maxLoginFailures {
+			rec := login(remoteAddr, forwardedFor(i), fmt.Sprintf("guess%d", i), "wrong")
+			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "did not match") {
+				t.Fatalf("failure %d: status=%d", i+1, rec.Code)
+			}
+		}
+	}
+	assertBlocked := func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "900" || !strings.Contains(rec.Body.String(), "Too many failed login attempts") {
+			t.Fatalf("status=%d retry-after=%q, want 429 with Retry-After 900", rec.Code, rec.Header().Get("Retry-After"))
+		}
+	}
+	assertLoggedIn := func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status=%d, want 303", rec.Code)
+		}
+	}
+
+	t.Run("no trusted proxies skips the IP limit", func(t *testing.T) {
+		login := newLogin(t, nil)
+		failFromOneIP(t, login, "203.0.113.7:4000", func(int) string { return "" })
+		assertLoggedIn(t, login("203.0.113.7:4000", "", "aiden", "test-password"))
+	})
+
+	t.Run("username limit applies without trusted proxies", func(t *testing.T) {
+		login := newLogin(t, nil)
+		for i := range maxLoginFailures {
+			login(fmt.Sprintf("203.0.113.%d:4000", i+1), "", "caleb", "wrong")
+		}
+		assertBlocked(t, login("203.0.113.99:4000", "", "caleb", "test-password"))
+		assertLoggedIn(t, login("203.0.113.99:4000", "", "aiden", "test-password"))
+	})
+
+	t.Run("trusted forwarded client is limited", func(t *testing.T) {
+		login := newLogin(t, proxies)
+		failFromOneIP(t, login, "10.0.1.5:4000", func(int) string { return "198.51.100.10" })
+		assertBlocked(t, login("10.0.1.6:4000", "198.51.100.10", "aiden", "test-password"))
+		assertLoggedIn(t, login("10.0.1.5:4000", "198.51.100.11", "aiden", "test-password"))
+	})
+
+	t.Run("proxy peer without forwarded header skips the IP limit", func(t *testing.T) {
+		login := newLogin(t, proxies)
+		failFromOneIP(t, login, "10.0.1.5:4000", func(int) string { return "" })
+		assertLoggedIn(t, login("10.0.1.5:4000", "", "aiden", "test-password"))
+	})
+
+	t.Run("spoofed header from untrusted peer keys on the peer", func(t *testing.T) {
+		login := newLogin(t, proxies)
+		failFromOneIP(t, login, "203.0.113.7:4000", func(i int) string { return fmt.Sprintf("198.51.100.%d", i) })
+		assertBlocked(t, login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password"))
+	})
 }

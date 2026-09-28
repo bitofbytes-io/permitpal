@@ -176,12 +176,12 @@ func RequirementByKey(requirements []Requirement, key string) (Requirement, bool
 	return Requirement{}, false
 }
 
-func ParseDate(value string) (*time.Time, error) {
+func ParseDate(value string, loc *time.Location) (*time.Time, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return nil, nil
 	}
-	t, err := time.ParseInLocation("2006-01-02", value, time.Local)
+	t, err := time.ParseInLocation("2006-01-02", value, loc)
 	if err != nil {
 		return nil, err
 	}
@@ -202,9 +202,12 @@ func DisplayDate(date *time.Time) string {
 	return date.Format("Jan 2, 2006")
 }
 
+// startOfDay returns t's calendar date, taken in t's own location, as UTC
+// midnight. Dates from Postgres (UTC) and the app time zone then compare as
+// whole days, unaffected by offsets or DST.
 func startOfDay(t time.Time) time.Time {
 	y, m, d := t.Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, t.Location())
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 func projectedRequirementDate(startDate, today time.Time, current, required float64) (time.Time, bool) {

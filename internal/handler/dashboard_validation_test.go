@@ -31,7 +31,7 @@ func TestDashboardValidation(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			handler := NewDashboardHandler(store)
+			handler := NewDashboardHandler(store, time.Local)
 			handler.now = func() time.Time { return now }
 			router := chi.NewRouter()
 			router.Post("/profile", handler.UpdateProfile)
@@ -220,7 +220,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			handler := NewDashboardHandler(store)
+			handler := NewDashboardHandler(store, time.Local)
 			handler.now = func() time.Time { return now }
 			router := chi.NewRouter()
 			router.Post("/requirements/{key}", handler.UpdateRequirement)
@@ -336,7 +336,7 @@ func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			handler := NewDashboardHandler(store)
+			handler := NewDashboardHandler(store, time.Local)
 			router := chi.NewRouter()
 			router.Post("/requirements/{key}", handler.UpdateRequirement)
 			submit := func(form url.Values) *httptest.ResponseRecorder {

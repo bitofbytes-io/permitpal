@@ -33,6 +33,10 @@ func NewStore(ctx context.Context, cfg *config.Config) (Store, CloseFunc, error)
 			pool.Close()
 			return nil, nil, fmt.Errorf("ping postgres: %w", err)
 		}
+		if err := CheckSchemaVersion(ctx, pool); err != nil {
+			pool.Close()
+			return nil, nil, err
+		}
 		store := NewPostgresStore(pool)
 		return store, pool.Close, nil
 	default:

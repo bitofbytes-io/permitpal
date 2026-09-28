@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/drywaters/permitpal/internal/middleware"
+	"github.com/drywaters/permitpal/internal/model"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/go-chi/chi/v5"
 )
@@ -77,7 +78,7 @@ func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
 		t.Fatal(err)
 	}
 	req = req.WithContext(middleware.WithDriver(req.Context(), driver))
-	handler := NewDashboardHandler(store)
+	handler := NewDashboardHandler(store, time.Local)
 
 	handler.UpdateProfile(rec, req)
 
@@ -128,10 +129,43 @@ func updateRequirementWithNotes(t *testing.T, notes string) *httptest.ResponseRe
 		t.Fatal(err)
 	}
 	req = req.WithContext(middleware.WithDriver(req.Context(), driver))
-	handler := NewDashboardHandler(store)
+	handler := NewDashboardHandler(store, time.Local)
 	router.Post("/requirements/{key}", handler.UpdateRequirement)
 
 	router.ServeHTTP(rec, req)
 
 	return rec
+}
+
+func TestRatingDefaultsToLocalDateLateInTheEvening(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Date(2026, 9, 26, 23, 30, 0, 0, loc)
+	store := repository.NewMemoryStore(now)
+	driver, err := store.EnsureDriver(context.Background(), "aiden", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := NewDashboardHandler(store, loc)
+	handler.now = func() time.Time { return now.UTC() }
+	router := chi.NewRouter()
+	router.Post("/requirements/{key}", handler.UpdateRequirement)
+	form := url.Values{"rating": {"good"}}
+	req := httptest.NewRequest(http.MethodPost, "/requirements/quick-stop", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req.WithContext(middleware.WithDriver(req.Context(), driver)))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d; body = %q", rec.Code, rec.Body.String())
+	}
+	dashboard, err := store.GetDashboard(context.Background(), driver, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirement, _ := model.RequirementByKey(dashboard.Requirements, "quick-stop")
+	if got := model.DateValue(requirement.RatedOn); got != "2026-09-26" {
+		t.Fatalf("rated on = %q, want the New York date 2026-09-26", got)
+	}
 }

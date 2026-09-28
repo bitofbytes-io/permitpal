@@ -47,13 +47,31 @@ func TestPercentDoesNotRoundIncompleteProgressToOneHundred(t *testing.T) {
 	}
 }
 
-func TestParseDateUsesLocalLocation(t *testing.T) {
-	got, err := ParseDate("2026-05-02")
+func TestParseDateUsesGivenLocation(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ParseDate("2026-05-02", loc)
 	if err != nil || got == nil {
 		t.Fatalf("ParseDate returned %v, %v", got, err)
 	}
-	if got.Location() != time.Local {
-		t.Fatalf("location = %v, want %v", got.Location(), time.Local)
+	if got.Location() != loc || DateValue(got) != "2026-05-02" {
+		t.Fatalf("ParseDate = %v, want 2026-05-02 in %v", got, loc)
+	}
+}
+
+func TestEstimateUsesLocalDateLateInTheEvening(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Postgres returns dates as UTC midnight; 23:30 in New York is already the next day in UTC.
+	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 9, 26, 23, 30, 0, 0, loc)
+	profile := Profile{PermitIssueDate: &start, TotalHours: 25, NightHours: 10}
+	if got := EstimateReadyDate(profile, now); got != "On pace for October 31, 2026" {
+		t.Fatalf("EstimateReadyDate() = %q, want pace from 25 elapsed days", got)
 	}
 }
 

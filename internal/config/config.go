@@ -3,10 +3,13 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+	_ "time/tzdata" // The Alpine image has no zoneinfo; embed it for APP_TIMEZONE.
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
@@ -31,6 +34,10 @@ type Config struct {
 	SecureCookies   bool
 	SessionCookie   string
 	DefaultUsername string
+	// TrustedProxies lists peers whose X-Forwarded-For header is honored.
+	TrustedProxies []netip.Prefix
+	// Location decides the calendar date for "today" and submitted dates.
+	Location *time.Location
 }
 
 func Load() (*Config, error) {
@@ -86,6 +93,16 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	timezone := strings.TrimSpace(getEnv("APP_TIMEZONE", "America/New_York"))
+	cfg.Location, err = time.LoadLocation(timezone)
+	if err != nil {
+		return nil, fmt.Errorf("APP_TIMEZONE must be an IANA time zone, got %q: %w", timezone, err)
+	}
+	cfg.TrustedProxies, err = parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS"))
+	if err != nil {
+		return nil, err
+	}
+
 	if cfg.DataStore != DataStoreMemory && cfg.DataStore != DataStorePostgres {
 		return nil, fmt.Errorf("DATA_STORE must be memory or postgres, got %q", cfg.DataStore)
 	}
@@ -130,6 +147,36 @@ func defaultSecureCookies(appEnv string) string {
 		return "true"
 	}
 	return "false"
+}
+
+// parseTrustedProxies reads a comma-separated list of CIDRs or single IPs.
+func parseTrustedProxies(value string) ([]netip.Prefix, error) {
+	var prefixes []netip.Prefix
+	for _, entry := range strings.Split(value, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if prefix, err := netip.ParsePrefix(entry); err == nil {
+			// Client addresses are unmapped before matching, so rebase
+			// IPv4-mapped IPv6 prefixes onto IPv4.
+			if prefix.Addr().Is4In6() {
+				if prefix.Bits() < 96 {
+					return nil, fmt.Errorf("TRUSTED_PROXY_CIDRS IPv4-mapped prefix %q must be /96 or longer", entry)
+				}
+				prefix = netip.PrefixFrom(prefix.Addr().Unmap(), prefix.Bits()-96)
+			}
+			prefixes = append(prefixes, prefix.Masked())
+			continue
+		}
+		addr, err := netip.ParseAddr(entry)
+		if err != nil {
+			return nil, fmt.Errorf("TRUSTED_PROXY_CIDRS contains invalid CIDR or IP %q", entry)
+		}
+		addr = addr.Unmap()
+		prefixes = append(prefixes, netip.PrefixFrom(addr, addr.BitLen()))
+	}
+	return prefixes, nil
 }
 
 func parseBoolEnv(key, fallback string) (bool, error) {
@@ -180,6 +227,10 @@ func readSecret(path, name string, allowMissing bool) (string, error) {
 }
 
 var validUsername = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+
+// ValidUsername reports whether username matches the account username rule.
+func ValidUsername(username string) bool { return validUsername.MatchString(username) }
+
 var bcryptEncoding = regexp.MustCompile(`^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$`)
 
 func validBcrypt(hash string) bool {

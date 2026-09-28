@@ -60,6 +60,10 @@ For users-file-only deployments, remove the old secret mount at `/run/secrets/pe
 | `SECURE_COOKIES` | No | Defaults to `true` in production and `false` in development |
 | `PORT` | No | HTTP port; defaults to `4600` |
 | `LOG_LEVEL` | No | Application log level; defaults to `info` |
+| `APP_TIMEZONE` | No | IANA time zone that decides "today" for rating dates and pace estimates; defaults to `America/New_York`. Time zone data is built into the binary |
+| `TRUSTED_PROXY_CIDRS` | Behind a reverse proxy | Comma-separated CIDRs or IPs whose `X-Forwarded-For` header is trusted; defaults to empty, which ignores forwarded headers and disables the per-IP login limit |
+
+Failed logins are limited to 20 per username and, when the real client IP is known, 20 per client IP in a 15-minute window; further attempts get HTTP 429 with `Retry-After` until the window ends, and a successful login clears that username's failures. Counters are in memory per replica and reset on restart. The per-IP limit applies only when `TRUSTED_PROXY_CIDRS` is set: a peer outside those CIDRs is a direct client keyed by its TCP address, and a peer inside them is keyed by the rightmost `X-Forwarded-For` address that is not a trusted proxy. With `TRUSTED_PROXY_CIDRS` empty, or when a trusted proxy sends no usable `X-Forwarded-For`, only the username limit applies. The username limit lets anyone lock a known username out for 15 minutes. A username that cannot exist under the rule below fails without a password check and counts only toward the per-IP limit. The limiter tracks at most 10,000 keys and evicts the oldest window beyond that. Behind Traefik on a Docker Swarm overlay network, set `TRUSTED_PROXY_CIDRS` to that network's subnet, for example the output of `docker network inspect proxy --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'`.
 
 Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames across users entries and the legacy account are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, password, password hash, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
 
@@ -86,6 +90,8 @@ go install github.com/pressly/goose/v3/cmd/goose@latest
 export DATABASE_URL='postgres://permitpal:change-me@localhost:5432/permitpal?sslmode=disable'
 goose -dir migrations postgres "$DATABASE_URL" up
 ```
+
+With `DATA_STORE=postgres`, PermitPal reads the applied goose version from `goose_db_version` at startup and exits with an error if it is older than the newest migration the binary was built with. CI deploys new images automatically on pushes to `main`, so apply migrations before merging a change that adds one; otherwise the new replicas refuse to start and Swarm keeps or rolls back to the previous version. When adding a migration, bump `repository.SchemaVersion`; a test fails until it matches `migrations/`.
 
 ## Run with Docker
 

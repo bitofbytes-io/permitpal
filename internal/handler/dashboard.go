@@ -27,10 +27,16 @@ const (
 type DashboardHandler struct {
 	store repository.Store
 	now   func() time.Time
+	loc   *time.Location
 }
 
-func NewDashboardHandler(store repository.Store) *DashboardHandler {
-	return &DashboardHandler{store: store, now: time.Now}
+// NewDashboardHandler uses loc to decide today's date and to parse submitted dates.
+func NewDashboardHandler(store repository.Store, loc *time.Location) *DashboardHandler {
+	return &DashboardHandler{store: store, now: time.Now, loc: loc}
+}
+
+func (h *DashboardHandler) localNow() time.Time {
+	return h.now().In(h.loc)
 }
 
 func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
@@ -39,7 +45,7 @@ func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Authentication required", http.StatusUnauthorized)
 		return
 	}
-	dashboard, err := h.store.GetDashboard(r.Context(), driver, h.now())
+	dashboard, err := h.store.GetDashboard(r.Context(), driver, h.localNow())
 	if err != nil {
 		http.Error(w, "Unable to load dashboard", http.StatusInternalServerError)
 		return
@@ -68,13 +74,13 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	permitIssueDate, err := model.ParseDate(r.FormValue("permit_issue_date"))
+	permitIssueDate, err := model.ParseDate(r.FormValue("permit_issue_date"), h.loc)
 	if err != nil {
 		http.Error(w, "Permit issue date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
 	}
 
-	current, err := h.store.GetDashboard(r.Context(), driver, h.now())
+	current, err := h.store.GetDashboard(r.Context(), driver, h.localNow())
 	if err != nil {
 		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
 		return
@@ -91,7 +97,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	updated := model.NewDashboard(driver, profile, current.Requirements, h.now())
+	updated := model.NewDashboard(driver, profile, current.Requirements, h.localNow())
 	slog.Info("profile updated", "total_hours", profile.TotalHours, "night_hours", profile.NightHours, "has_permit_issue_date", profile.PermitIssueDate != nil)
 	render(w, r, ui.ProgressPanelWithMessage(updated, "Progress saved"))
 }
@@ -115,7 +121,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Rating must be not_rated, bad, fair, or good", http.StatusBadRequest)
 		return
 	}
-	ratedOn, err := model.ParseDate(r.FormValue("rated_on"))
+	ratedOn, err := model.ParseDate(r.FormValue("rated_on"), h.loc)
 	if err != nil {
 		http.Error(w, "Last rated date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
@@ -126,7 +132,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	key := chi.URLParam(r, "key")
-	current, err := h.store.GetDashboard(r.Context(), driver, h.now())
+	current, err := h.store.GetDashboard(r.Context(), driver, h.localNow())
 	if err != nil {
 		http.Error(w, "Unable to load requirement", http.StatusInternalServerError)
 		return
@@ -143,7 +149,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 	if existing.Rating == model.RatingNotRated {
 		existing.RatedOn = nil
 	} else if existing.RatedOn == nil {
-		date, _ := model.ParseDate(h.now().Format("2006-01-02"))
+		date, _ := model.ParseDate(h.localNow().Format("2006-01-02"), h.loc)
 		existing.RatedOn = date
 	}
 
@@ -157,7 +163,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	slog.Info("requirement updated", "requirement", updated.Key, "status", updated.Rating, "has_rated_on", updated.RatedOn != nil)
-	render(w, r, ui.RequirementUpdate(updated, model.NewDashboard(driver, current.Profile, replaceRequirement(current.Requirements, updated), h.now())))
+	render(w, r, ui.RequirementUpdate(updated, model.NewDashboard(driver, current.Profile, replaceRequirement(current.Requirements, updated), h.localNow())))
 }
 
 func parseHours(value string, max float64) (float64, error) {
