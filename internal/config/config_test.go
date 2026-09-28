@@ -1,6 +1,7 @@
 package config
 
 import (
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -239,6 +240,27 @@ func TestTrustedProxyCIDRs(t *testing.T) {
 	}
 	if strings.Join(got, ",") != "10.0.1.0/24,192.0.2.10/32,fd00::/8" {
 		t.Fatalf("trusted proxies = %v", got)
+	}
+
+	t.Setenv("TRUSTED_PROXY_CIDRS", "::ffff:10.0.1.0/120, ::ffff:192.0.2.10/128, ::ffff:192.0.2.10")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got = got[:0]
+	for _, prefix := range cfg.TrustedProxies {
+		got = append(got, prefix.String())
+	}
+	if strings.Join(got, ",") != "10.0.1.0/24,192.0.2.10/32,192.0.2.10/32" {
+		t.Fatalf("IPv4-mapped trusted proxies = %v", got)
+	}
+	if !cfg.TrustedProxies[0].Contains(netip.MustParseAddr("10.0.1.5")) {
+		t.Fatal("rebased IPv4-mapped prefix does not match an unmapped IPv4 address")
+	}
+
+	t.Setenv("TRUSTED_PROXY_CIDRS", "::ffff:0.0.0.0/95")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "/96 or longer") {
+		t.Fatalf("Load error = %v, want IPv4-mapped prefix length error", err)
 	}
 
 	t.Setenv("TRUSTED_PROXY_CIDRS", "10.0.1.0/24,proxy")
