@@ -90,6 +90,8 @@ export DATABASE_URL='postgres://permitpal:change-me@localhost:5432/permitpal?ssl
 goose -dir migrations postgres "$DATABASE_URL" up
 ```
 
+With `DATA_STORE=postgres`, PermitPal reads the applied goose version from `goose_db_version` at startup and exits with an error if it is older than the newest migration the binary was built with. CI deploys new images automatically on pushes to `main`, so apply migrations before merging a change that adds one; otherwise the new replicas refuse to start and Swarm keeps or rolls back to the previous version. When adding a migration, bump `repository.SchemaVersion`; a test fails until it matches `migrations/`.
+
 ## Run with Docker
 
 ```bash
