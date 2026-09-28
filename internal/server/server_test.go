@@ -114,6 +114,7 @@ func newTestApp(t *testing.T) *Server {
 		Port:          "4600",
 		SessionSecret: "test-session-secret-32-chars-ok",
 		SessionCookie: "permitpal_session",
+		Location:      time.Local,
 	}
 	store := repository.NewMemoryStore(time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local))
 	caleb, err := store.EnsureDriver(context.Background(), "caleb", time.Now())

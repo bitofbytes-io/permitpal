@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+	_ "time/tzdata" // The Alpine image has no zoneinfo; embed it for APP_TIMEZONE.
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
@@ -34,6 +36,8 @@ type Config struct {
 	DefaultUsername string
 	// TrustedProxies lists peers whose X-Forwarded-For header is honored.
 	TrustedProxies []netip.Prefix
+	// Location decides the calendar date for "today" and submitted dates.
+	Location *time.Location
 }
 
 func Load() (*Config, error) {
@@ -89,6 +93,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	timezone := strings.TrimSpace(getEnv("APP_TIMEZONE", "America/New_York"))
+	cfg.Location, err = time.LoadLocation(timezone)
+	if err != nil {
+		return nil, fmt.Errorf("APP_TIMEZONE must be an IANA time zone, got %q: %w", timezone, err)
+	}
 	cfg.TrustedProxies, err = parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS"))
 	if err != nil {
 		return nil, err

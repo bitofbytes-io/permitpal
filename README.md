@@ -60,6 +60,7 @@ For users-file-only deployments, remove the old secret mount at `/run/secrets/pe
 | `SECURE_COOKIES` | No | Defaults to `true` in production and `false` in development |
 | `PORT` | No | HTTP port; defaults to `4600` |
 | `LOG_LEVEL` | No | Application log level; defaults to `info` |
+| `APP_TIMEZONE` | No | IANA time zone that decides "today" for rating dates and pace estimates; defaults to `America/New_York`. Time zone data is built into the binary |
 | `TRUSTED_PROXY_CIDRS` | Behind a reverse proxy | Comma-separated CIDRs or IPs whose `X-Forwarded-For` header is trusted; defaults to empty, which uses the TCP peer address |
 
 Failed logins are limited to 5 per client IP and 5 per username in a 15-minute window; further attempts get HTTP 429 with `Retry-After` until the window ends, and a successful login clears that username's failures. Counters are in memory per replica and reset on restart. The client IP comes from `X-Forwarded-For` only when the direct peer is in `TRUSTED_PROXY_CIDRS`; the rightmost untrusted address is used. Behind Traefik on a Docker Swarm overlay network, set it to that network's subnet, for example the output of `docker network inspect proxy --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'`. Leaving it empty behind a proxy makes every client share the proxy's IP bucket.

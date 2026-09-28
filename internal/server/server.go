@@ -54,7 +54,7 @@ func (s *Server) Router() http.Handler {
 	r.Post("/login", authHandler.Login)
 	r.Post("/logout", authHandler.Logout)
 
-	dashboardHandler := handler.NewDashboardHandler(s.store)
+	dashboardHandler := handler.NewDashboardHandler(s.store, s.cfg.Location)
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.RequireAuth(authManager, s.store))
 		r.Get("/", dashboardHandler.Dashboard)

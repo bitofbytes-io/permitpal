@@ -246,3 +246,24 @@ func TestTrustedProxyCIDRs(t *testing.T) {
 		t.Fatalf("Load error = %v, want TRUSTED_PROXY_CIDRS error", err)
 	}
 }
+
+func TestAppTimezone(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+	t.Setenv("SESSION_SECRET", "local-session-secret-32-bytes-ok")
+
+	t.Setenv("APP_TIMEZONE", "")
+	cfg, err := Load()
+	if err != nil || cfg.Location.String() != "America/New_York" {
+		t.Fatalf("default location = %v, %v; want America/New_York", cfg, err)
+	}
+	t.Setenv("APP_TIMEZONE", "America/Chicago")
+	if cfg, err = Load(); err != nil || cfg.Location.String() != "America/Chicago" {
+		t.Fatalf("location = %v, %v; want America/Chicago", cfg, err)
+	}
+	t.Setenv("APP_TIMEZONE", "Eastern")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "APP_TIMEZONE") {
+		t.Fatalf("Load error = %v, want APP_TIMEZONE error", err)
+	}
+}
