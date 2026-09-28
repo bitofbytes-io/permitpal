@@ -238,45 +238,81 @@ func TestSeparateLoginsAndInvalidCredentials(t *testing.T) {
 	}
 }
 
-func TestLoginFailuresAreRateLimitedPerClientIP(t *testing.T) {
-	app := newTestApp(t)
-	app.cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("10.0.1.0/24")}
-	router := app.Router()
-	login := func(remoteAddr, forwardedFor, username, password string) *httptest.ResponseRecorder {
+func TestLoginRateLimits(t *testing.T) {
+	proxies := []netip.Prefix{netip.MustParsePrefix("10.0.1.0/24")}
+	newLogin := func(t *testing.T, trusted []netip.Prefix) func(remoteAddr, forwardedFor, username, password string) *httptest.ResponseRecorder {
+		app := newTestApp(t)
+		app.cfg.TrustedProxies = trusted
+		router := app.Router()
+		return func(remoteAddr, forwardedFor, username, password string) *httptest.ResponseRecorder {
+			t.Helper()
+			form := url.Values{"username": {username}, "password": {password}}
+			req := httptest.NewRequest(http.MethodPost, "http://permitpal.test/login", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Origin", "http://permitpal.test")
+			req.RemoteAddr = remoteAddr
+			if forwardedFor != "" {
+				req.Header.Set("X-Forwarded-For", forwardedFor)
+			}
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			return rec
+		}
+	}
+	// failFromOneIP spends the per-IP budget using a different username each time.
+	failFromOneIP := func(t *testing.T, login func(string, string, string, string) *httptest.ResponseRecorder, remoteAddr string, forwardedFor func(int) string) {
 		t.Helper()
-		form := url.Values{"username": {username}, "password": {password}}
-		req := httptest.NewRequest(http.MethodPost, "http://permitpal.test/login", strings.NewReader(form.Encode()))
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-		req.Header.Set("Origin", "http://permitpal.test")
-		req.RemoteAddr = remoteAddr
-		if forwardedFor != "" {
-			req.Header.Set("X-Forwarded-For", forwardedFor)
-		}
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		return rec
-	}
-
-	// A direct client rotating a spoofed X-Forwarded-For still shares one IP bucket.
-	for i := range maxLoginFailures {
-		rec := login("203.0.113.7:4000", fmt.Sprintf("198.51.100.%d", i), fmt.Sprintf("guess%d", i), "wrong")
-		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "did not match") {
-			t.Fatalf("failure %d: status=%d", i+1, rec.Code)
+		for i := range maxLoginFailures {
+			rec := login(remoteAddr, forwardedFor(i), fmt.Sprintf("guess%d", i), "wrong")
+			if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "did not match") {
+				t.Fatalf("failure %d: status=%d", i+1, rec.Code)
+			}
 		}
 	}
-	rec := login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password")
-	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "900" || !strings.Contains(rec.Body.String(), "Too many failed login attempts") {
-		t.Fatalf("blocked login: status=%d retry-after=%q", rec.Code, rec.Header().Get("Retry-After"))
+	assertBlocked := func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "900" || !strings.Contains(rec.Body.String(), "Too many failed login attempts") {
+			t.Fatalf("status=%d retry-after=%q, want 429 with Retry-After 900", rec.Code, rec.Header().Get("Retry-After"))
+		}
+	}
+	assertLoggedIn := func(t *testing.T, rec *httptest.ResponseRecorder) {
+		t.Helper()
+		if rec.Code != http.StatusSeeOther {
+			t.Fatalf("status=%d, want 303", rec.Code)
+		}
 	}
 
-	// Behind a trusted proxy, the forwarded client IP is the limiter key.
-	if rec := login("10.0.1.5:4000", "198.51.100.10", "aiden", "test-password"); rec.Code != http.StatusSeeOther {
-		t.Fatalf("proxied client from a fresh IP: status=%d", rec.Code)
-	}
-	for i := range maxLoginFailures {
-		login("10.0.1.5:4000", fmt.Sprintf("198.51.100.%d", 20+i), "caleb", "wrong")
-	}
-	if rec := login("10.0.1.5:4000", "198.51.100.99", "caleb", "test-password"); rec.Code != http.StatusTooManyRequests {
-		t.Fatalf("username lockout: status=%d, want 429", rec.Code)
-	}
+	t.Run("no trusted proxies skips the IP limit", func(t *testing.T) {
+		login := newLogin(t, nil)
+		failFromOneIP(t, login, "203.0.113.7:4000", func(int) string { return "" })
+		assertLoggedIn(t, login("203.0.113.7:4000", "", "aiden", "test-password"))
+	})
+
+	t.Run("username limit applies without trusted proxies", func(t *testing.T) {
+		login := newLogin(t, nil)
+		for i := range maxLoginFailures {
+			login(fmt.Sprintf("203.0.113.%d:4000", i+1), "", "caleb", "wrong")
+		}
+		assertBlocked(t, login("203.0.113.99:4000", "", "caleb", "test-password"))
+		assertLoggedIn(t, login("203.0.113.99:4000", "", "aiden", "test-password"))
+	})
+
+	t.Run("trusted forwarded client is limited", func(t *testing.T) {
+		login := newLogin(t, proxies)
+		failFromOneIP(t, login, "10.0.1.5:4000", func(int) string { return "198.51.100.10" })
+		assertBlocked(t, login("10.0.1.6:4000", "198.51.100.10", "aiden", "test-password"))
+		assertLoggedIn(t, login("10.0.1.5:4000", "198.51.100.11", "aiden", "test-password"))
+	})
+
+	t.Run("proxy peer without forwarded header skips the IP limit", func(t *testing.T) {
+		login := newLogin(t, proxies)
+		failFromOneIP(t, login, "10.0.1.5:4000", func(int) string { return "" })
+		assertLoggedIn(t, login("10.0.1.5:4000", "", "aiden", "test-password"))
+	})
+
+	t.Run("spoofed header from untrusted peer keys on the peer", func(t *testing.T) {
+		login := newLogin(t, proxies)
+		failFromOneIP(t, login, "203.0.113.7:4000", func(i int) string { return fmt.Sprintf("198.51.100.%d", i) })
+		assertBlocked(t, login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password"))
+	})
 }

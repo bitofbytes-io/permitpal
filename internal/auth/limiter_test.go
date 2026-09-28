@@ -84,3 +84,20 @@ func TestLoginLimiterSweepsExpiredEntries(t *testing.T) {
 		t.Fatalf("failures = %v, want only the latest attempt", limiter.failures)
 	}
 }
+
+func TestLoginLimiterSkipsUnknownIP(t *testing.T) {
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	limiter := newTestLimiter(&now)
+	for i := range 10 {
+		if _, ok := limiter.Allow("", fmt.Sprintf("user%d", i)); !ok {
+			t.Fatalf("attempt %d with unknown IP blocked", i+1)
+		}
+	}
+	if _, ok := limiter.failures["ip:"]; ok {
+		t.Fatal("unknown IP was tracked")
+	}
+	limiter.Succeed("", "user0")
+	if _, ok := limiter.failures["user:user0"]; ok {
+		t.Fatal("success did not clear username failures")
+	}
+}

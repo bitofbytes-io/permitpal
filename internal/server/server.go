@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	maxLoginFailures   = 5
+	maxLoginFailures   = 20
 	loginFailureWindow = 15 * time.Minute
 )
 

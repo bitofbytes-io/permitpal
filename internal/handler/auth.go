@@ -40,19 +40,23 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := auth.NormalizeUsername(r.FormValue("username"))
-	clientIP := middleware.ClientIP(r)
-	if wait, ok := h.limiter.Allow(clientIP, username); !ok {
-		slog.Warn("login failed", "reason", "rate_limited", "username", username, "client_ip", clientIP)
+	clientIP, ipVerified := middleware.VerifiedClientIP(r)
+	limitIP := ""
+	if ipVerified {
+		limitIP = clientIP
+	}
+	if wait, ok := h.limiter.Allow(limitIP, username); !ok {
+		slog.Warn("login failed", "reason", "rate_limited", "username", username, "client_ip", clientIP, "client_ip_verified", ipVerified)
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
 		renderStatus(w, r, http.StatusTooManyRequests, ui.LoginPage("Too many failed login attempts. Try again later.", r.FormValue("username")))
 		return
 	}
 	if !h.auth.CheckCredentials(username, r.FormValue("password")) {
-		slog.Info("login failed", "reason", "invalid_password", "username", username, "client_ip", clientIP)
+		slog.Info("login failed", "reason", "invalid_password", "username", username, "client_ip", clientIP, "client_ip_verified", ipVerified)
 		render(w, r, ui.LoginPage("That username and password did not match.", r.FormValue("username")))
 		return
 	}
-	h.limiter.Succeed(clientIP, username)
+	h.limiter.Succeed(limitIP, username)
 	if _, err := h.store.EnsureDriver(r.Context(), username, time.Now()); err != nil {
 		http.Error(w, "Unable to load driver", http.StatusInternalServerError)
 		return

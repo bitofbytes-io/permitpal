@@ -27,7 +27,8 @@ func NewLoginLimiter(max int, window time.Duration) *LoginLimiter {
 	return &LoginLimiter{max: max, window: window, now: time.Now, failures: make(map[string]failureWindow)}
 }
 
-// Allow reserves a login attempt for ip and username. When either key has
+// Allow reserves a login attempt for ip and username. An empty ip, used when
+// the real client IP is unknown, skips the per-IP limit. When either key has
 // reached the failure limit, it returns false and the time until the oldest
 // window expires.
 func (l *LoginLimiter) Allow(ip, username string) (time.Duration, bool) {
@@ -63,6 +64,9 @@ func (l *LoginLimiter) Succeed(ip, username string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.failures, "user:"+username)
+	if ip == "" {
+		return
+	}
 	key := "ip:" + ip
 	if f, ok := l.active(key, l.now()); ok && f.count > 1 {
 		f.count--
@@ -92,5 +96,9 @@ func (l *LoginLimiter) sweep(now time.Time) {
 }
 
 func limiterKeys(ip, username string) []string {
-	return []string{"ip:" + ip, "user:" + username}
+	keys := []string{"user:" + username}
+	if ip != "" {
+		keys = append(keys, "ip:"+ip)
+	}
+	return keys
 }
