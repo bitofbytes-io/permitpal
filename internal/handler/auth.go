@@ -2,21 +2,25 @@ package handler
 
 import (
 	"log/slog"
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/drywaters/permitpal/internal/auth"
+	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/ui"
 )
 
 type AuthHandler struct {
-	auth  *auth.Manager
-	store repository.Store
+	auth    *auth.Manager
+	store   repository.Store
+	limiter *auth.LoginLimiter
 }
 
-func NewAuthHandler(authManager *auth.Manager, store repository.Store) *AuthHandler {
-	return &AuthHandler{auth: authManager, store: store}
+func NewAuthHandler(authManager *auth.Manager, store repository.Store, limiter *auth.LoginLimiter) *AuthHandler {
+	return &AuthHandler{auth: authManager, store: store, limiter: limiter}
 }
 
 func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
@@ -36,11 +40,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username := auth.NormalizeUsername(r.FormValue("username"))
+	clientIP := middleware.ClientIP(r)
+	if wait, ok := h.limiter.Allow(clientIP, username); !ok {
+		slog.Warn("login failed", "reason", "rate_limited", "username", username, "client_ip", clientIP)
+		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
+		renderStatus(w, r, http.StatusTooManyRequests, ui.LoginPage("Too many failed login attempts. Try again later.", r.FormValue("username")))
+		return
+	}
 	if !h.auth.CheckCredentials(username, r.FormValue("password")) {
-		slog.Info("login failed", "reason", "invalid_password")
+		slog.Info("login failed", "reason", "invalid_password", "username", username, "client_ip", clientIP)
 		render(w, r, ui.LoginPage("That username and password did not match.", r.FormValue("username")))
 		return
 	}
+	h.limiter.Succeed(clientIP, username)
 	if _, err := h.store.EnsureDriver(r.Context(), username, time.Now()); err != nil {
 		http.Error(w, "Unable to load driver", http.StatusInternalServerError)
 		return

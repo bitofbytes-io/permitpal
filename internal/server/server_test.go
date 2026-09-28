@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"strings"
 	"testing"
@@ -96,6 +98,11 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
+	return httptest.NewServer(newTestApp(t).Router())
+}
+
+func newTestApp(t *testing.T) *Server {
+	t.Helper()
 	hash, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
 	if err != nil {
 		t.Fatal(err)
@@ -116,8 +123,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	if _, err := store.UpdateProfile(context.Background(), caleb.ID, model.Profile{TotalHours: 56, NightHours: 8}); err != nil {
 		t.Fatal(err)
 	}
-	app := New(cfg, store, slog.Default())
-	return httptest.NewServer(app.Router())
+	return New(cfg, store, slog.Default())
 }
 
 func doGet(t *testing.T, client *http.Client, url string) *http.Response {
@@ -228,5 +234,48 @@ func TestSeparateLoginsAndInvalidCredentials(t *testing.T) {
 	body = readBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"caleb"}, "password": {"test-password"}}))
 	if !strings.Contains(body, "Welcome back, Caleb!") || !strings.Contains(body, "56.0 total hours") || !strings.Contains(body, "8.0 night hours") {
 		t.Fatal("Caleb lost existing progress")
+	}
+}
+
+func TestLoginFailuresAreRateLimitedPerClientIP(t *testing.T) {
+	app := newTestApp(t)
+	app.cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("10.0.1.0/24")}
+	router := app.Router()
+	login := func(remoteAddr, forwardedFor, username, password string) *httptest.ResponseRecorder {
+		t.Helper()
+		form := url.Values{"username": {username}, "password": {password}}
+		req := httptest.NewRequest(http.MethodPost, "http://permitpal.test/login", strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", "http://permitpal.test")
+		req.RemoteAddr = remoteAddr
+		if forwardedFor != "" {
+			req.Header.Set("X-Forwarded-For", forwardedFor)
+		}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	// A direct client rotating a spoofed X-Forwarded-For still shares one IP bucket.
+	for i := range maxLoginFailures {
+		rec := login("203.0.113.7:4000", fmt.Sprintf("198.51.100.%d", i), fmt.Sprintf("guess%d", i), "wrong")
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "did not match") {
+			t.Fatalf("failure %d: status=%d", i+1, rec.Code)
+		}
+	}
+	rec := login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password")
+	if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != "900" || !strings.Contains(rec.Body.String(), "Too many failed login attempts") {
+		t.Fatalf("blocked login: status=%d retry-after=%q", rec.Code, rec.Header().Get("Retry-After"))
+	}
+
+	// Behind a trusted proxy, the forwarded client IP is the limiter key.
+	if rec := login("10.0.1.5:4000", "198.51.100.10", "aiden", "test-password"); rec.Code != http.StatusSeeOther {
+		t.Fatalf("proxied client from a fresh IP: status=%d", rec.Code)
+	}
+	for i := range maxLoginFailures {
+		login("10.0.1.5:4000", fmt.Sprintf("198.51.100.%d", 20+i), "caleb", "wrong")
+	}
+	if rec := login("10.0.1.5:4000", "198.51.100.99", "caleb", "test-password"); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("username lockout: status=%d, want 429", rec.Code)
 	}
 }

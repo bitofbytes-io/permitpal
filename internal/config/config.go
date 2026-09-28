@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"regexp"
 	"strconv"
@@ -31,6 +32,8 @@ type Config struct {
 	SecureCookies   bool
 	SessionCookie   string
 	DefaultUsername string
+	// TrustedProxies lists peers whose X-Forwarded-For header is honored.
+	TrustedProxies []netip.Prefix
 }
 
 func Load() (*Config, error) {
@@ -86,6 +89,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	cfg.TrustedProxies, err = parseTrustedProxies(os.Getenv("TRUSTED_PROXY_CIDRS"))
+	if err != nil {
+		return nil, err
+	}
+
 	if cfg.DataStore != DataStoreMemory && cfg.DataStore != DataStorePostgres {
 		return nil, fmt.Errorf("DATA_STORE must be memory or postgres, got %q", cfg.DataStore)
 	}
@@ -130,6 +138,28 @@ func defaultSecureCookies(appEnv string) string {
 		return "true"
 	}
 	return "false"
+}
+
+// parseTrustedProxies reads a comma-separated list of CIDRs or single IPs.
+func parseTrustedProxies(value string) ([]netip.Prefix, error) {
+	var prefixes []netip.Prefix
+	for _, entry := range strings.Split(value, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if prefix, err := netip.ParsePrefix(entry); err == nil {
+			prefixes = append(prefixes, prefix.Masked())
+			continue
+		}
+		addr, err := netip.ParseAddr(entry)
+		if err != nil {
+			return nil, fmt.Errorf("TRUSTED_PROXY_CIDRS contains invalid CIDR or IP %q", entry)
+		}
+		addr = addr.Unmap()
+		prefixes = append(prefixes, netip.PrefixFrom(addr, addr.BitLen()))
+	}
+	return prefixes, nil
 }
 
 func parseBoolEnv(key, fallback string) (bool, error) {

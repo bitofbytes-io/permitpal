@@ -215,3 +215,34 @@ func TestSecretFileSelection(t *testing.T) {
 		})
 	}
 }
+
+func TestTrustedProxyCIDRs(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PERMITPAL_PASSWORD", "local-password")
+	t.Setenv("SESSION_SECRET", "local-session-secret-32-bytes-ok")
+
+	t.Setenv("TRUSTED_PROXY_CIDRS", "")
+	cfg, err := Load()
+	if err != nil || len(cfg.TrustedProxies) != 0 {
+		t.Fatalf("default trusted proxies = %v, %v; want none", cfg, err)
+	}
+
+	t.Setenv("TRUSTED_PROXY_CIDRS", " 10.0.1.7/24, 192.0.2.10 ,fd00::/8")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, prefix := range cfg.TrustedProxies {
+		got = append(got, prefix.String())
+	}
+	if strings.Join(got, ",") != "10.0.1.0/24,192.0.2.10/32,fd00::/8" {
+		t.Fatalf("trusted proxies = %v", got)
+	}
+
+	t.Setenv("TRUSTED_PROXY_CIDRS", "10.0.1.0/24,proxy")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "TRUSTED_PROXY_CIDRS") {
+		t.Fatalf("Load error = %v, want TRUSTED_PROXY_CIDRS error", err)
+	}
+}

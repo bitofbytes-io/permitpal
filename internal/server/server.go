@@ -3,6 +3,7 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/drywaters/permitpal/internal/auth"
 	"github.com/drywaters/permitpal/internal/config"
@@ -11,6 +12,11 @@ import (
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
+)
+
+const (
+	maxLoginFailures   = 5
+	loginFailureWindow = 15 * time.Minute
 )
 
 type Server struct {
@@ -26,7 +32,7 @@ func New(cfg *config.Config, store repository.Store, logger *slog.Logger) *Serve
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
+	r.Use(middleware.RealIP(s.cfg.TrustedProxies))
 	r.Use(middleware.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(middleware.RequireSameOrigin)
@@ -42,7 +48,8 @@ func (s *Server) Router() http.Handler {
 	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
 	authManager := auth.NewManager(s.cfg)
-	authHandler := handler.NewAuthHandler(authManager, s.store)
+	loginLimiter := auth.NewLoginLimiter(maxLoginFailures, loginFailureWindow)
+	authHandler := handler.NewAuthHandler(authManager, s.store, loginLimiter)
 	r.Get("/login", authHandler.LoginPage)
 	r.Post("/login", authHandler.Login)
 	r.Post("/logout", authHandler.Logout)
