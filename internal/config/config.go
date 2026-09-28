@@ -227,6 +227,10 @@ func readSecret(path, name string, allowMissing bool) (string, error) {
 }
 
 var validUsername = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+
+// ValidUsername reports whether username matches the account username rule.
+func ValidUsername(username string) bool { return validUsername.MatchString(username) }
+
 var bcryptEncoding = regexp.MustCompile(`^\$2[aby]\$[0-9]{2}\$[./A-Za-z0-9]{53}$`)
 
 func validBcrypt(hash string) bool {

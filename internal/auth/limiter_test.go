@@ -101,3 +101,37 @@ func TestLoginLimiterSkipsUnknownIP(t *testing.T) {
 		t.Fatal("success did not clear username failures")
 	}
 }
+
+func TestLoginLimiterSkipsEmptyUsername(t *testing.T) {
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	limiter := newTestLimiter(&now)
+	for i := range 5 {
+		if _, ok := limiter.Allow("192.0.2.1", ""); !ok {
+			t.Fatalf("attempt %d blocked", i+1)
+		}
+	}
+	if len(limiter.failures) != 1 {
+		t.Fatalf("failures = %v, want only the IP key", limiter.failures)
+	}
+	if _, ok := limiter.Allow("192.0.2.1", ""); ok {
+		t.Fatal("IP limit did not apply without a username")
+	}
+}
+
+func TestLoginLimiterCapsEntries(t *testing.T) {
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	limiter := newTestLimiter(&now)
+	limiter.maxEntries = 3
+	for i := range 10 {
+		now = now.Add(time.Second)
+		limiter.Allow("", fmt.Sprintf("user%d", i))
+		if len(limiter.failures) > 3 {
+			t.Fatalf("entries = %d, want at most 3", len(limiter.failures))
+		}
+	}
+	for _, key := range []string{"user:user7", "user:user8", "user:user9"} {
+		if _, ok := limiter.failures[key]; !ok {
+			t.Fatalf("newest entry %s was evicted: %v", key, limiter.failures)
+		}
+	}
+}
