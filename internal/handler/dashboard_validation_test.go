@@ -97,6 +97,22 @@ func TestDashboardValidation(t *testing.T) {
 					}
 				})
 			}
+			t.Run("clearing-a-saved-future-date", func(t *testing.T) {
+				// A rating saved before future dates were rejected can still be cleared.
+				req, _ := model.RequirementByKey(load().Requirements, "turn-about")
+				future := now.AddDate(0, 0, 3)
+				req.Rating, req.RatedOn = model.RatingGood, &future
+				if _, err := store.UpdateRequirement(context.Background(), driver.ID, req); err != nil {
+					t.Fatal(err)
+				}
+				rec := submit("/requirements/turn-about", url.Values{"rating": {"good"}, "rated_on": {future.Format("2006-01-02")}, "clear_rating": {"true"}})
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+				}
+				if cleared, _ := model.RequirementByKey(load().Requirements, "turn-about"); cleared.Rating != model.RatingNotRated || cleared.RatedOn != nil {
+					t.Fatalf("requirement not cleared: %+v", cleared)
+				}
+			})
 			t.Run("today-and-equal-hours-are-allowed", func(t *testing.T) {
 				if rec := submit("/profile", url.Values{"total_hours": {"4"}, "night_hours": {"4"}, "permit_issue_date": {"2026-05-01"}}); rec.Code != http.StatusOK {
 					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())

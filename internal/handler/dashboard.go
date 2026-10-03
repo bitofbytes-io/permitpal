@@ -136,7 +136,9 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Last rated date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
 	}
-	if h.isFuture(ratedOn) {
+	// Clearing discards the date, so a future date saved before this check
+	// must not block it.
+	if rating != model.RatingNotRated && h.isFuture(ratedOn) {
 		http.Error(w, "Last rated date cannot be in the future", http.StatusBadRequest)
 		return
 	}
