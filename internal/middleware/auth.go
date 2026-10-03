@@ -30,7 +30,7 @@ func RequireAuth(manager *auth.Manager, store repository.Store) func(http.Handle
 					return
 				}
 				if !errors.Is(err, repository.ErrNotFound) {
-					http.Error(w, "Unable to load driver", http.StatusInternalServerError)
+					ServerError(w, r, "Unable to load driver", err)
 					return
 				}
 			}

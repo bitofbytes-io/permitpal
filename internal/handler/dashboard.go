@@ -49,7 +49,7 @@ func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	driver, _ := middleware.DriverFromContext(r.Context())
 	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
 	if err != nil {
-		http.Error(w, "Unable to load dashboard", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to load dashboard", err)
 		return
 	}
 	render(w, r, ui.DashboardPage(h.dashboard(driver, tracker)))
@@ -80,7 +80,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 
 	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
 	if err != nil {
-		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to load profile", err)
 		return
 	}
 
@@ -91,7 +91,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 
 	tracker.Profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile)
 	if err != nil {
-		http.Error(w, "Unable to save progress", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to save progress", err)
 		return
 	}
 
@@ -127,7 +127,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 	key := chi.URLParam(r, "key")
 	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
 	if err != nil {
-		http.Error(w, "Unable to load requirement", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to load requirement", err)
 		return
 	}
 	existing, ok := model.RequirementByKey(tracker.Requirements, key)
@@ -152,7 +152,7 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 			http.NotFound(w, r)
 			return
 		}
-		http.Error(w, "Unable to save requirement", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to save requirement", err)
 		return
 	}
 	slog.Info("requirement updated", "requirement", updated.Key, "status", updated.Rating, "has_rated_on", updated.RatedOn != nil)

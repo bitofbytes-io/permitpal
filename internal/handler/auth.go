@@ -72,7 +72,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	h.limiter.Succeed(limitIP, username)
 	if _, err := h.store.EnsureDriver(r.Context(), username, time.Now()); err != nil {
-		http.Error(w, "Unable to load driver", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to load driver", err)
 		return
 	}
 	h.auth.SetSession(w, username)

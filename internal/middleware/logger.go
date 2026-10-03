@@ -40,3 +40,9 @@ func Logger(next http.Handler) http.Handler {
 		next.ServeHTTP(ww, r)
 	})
 }
+
+// ServerError logs err with the request ID, then responds 500 with message.
+func ServerError(w http.ResponseWriter, r *http.Request, message string, err error) {
+	slog.Error(message, "error", err, "method", r.Method, "path", r.URL.Path, "request_id", chimw.GetReqID(r.Context()))
+	http.Error(w, message, http.StatusInternalServerError)
+}
