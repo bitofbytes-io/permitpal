@@ -9,7 +9,7 @@ import (
 
 // SchemaVersion is the highest goose migration in migrations/ that this
 // binary requires. TestSchemaVersionMatchesMigrations keeps it in sync.
-const SchemaVersion int64 = 5
+const SchemaVersion int64 = 6
 
 type rowQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row

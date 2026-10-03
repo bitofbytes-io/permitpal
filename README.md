@@ -26,7 +26,7 @@ htpasswd -B -C 12 permitpal_users aiden
 openssl rand -base64 48
 ```
 
-Use `-c` only for the first account because it replaces the file. Keep the users file private and outside Git. A new username gets a fresh tracker on first login, with zero hours, no permit date, and the 17 road-test skills. Caleb's migrated tracker retains his original 13 skills and history.
+Use `-c` only for the first account because it replaces the file. Keep the users file private and outside Git. A new username gets a fresh tracker on first login, with zero hours, no permit date, and the 17 road-test skills. Caleb's migrated tracker retains his original 13 skills and history. Migration 001 also seeds that tracker into a new database; migration 006 removes it again when the same goose run created the database and nobody has saved to it, so a new install starts with no drivers.
 
 Mount `permitpal_users` at `/run/secrets/permitpal_users`. With Docker Swarm, create an external secret using `docker secret create permitpal_users permitpal_users` and mount it on every PermitPal replica. Swarm distributes the secret to the hosts running those replicas. Restart or redeploy after credential changes. The application reads credentials at startup; a removed account's cookie is rejected by the updated replicas. Session cookies last 30 days. Logging out signs that driver out on every device, because it advances a per-driver session generation that every cookie must match; cookies issued before generations existed count as generation 0 and stay valid until the driver's next logout.
 
@@ -86,7 +86,7 @@ export DATABASE_URL='postgres://permitpal:change-me@localhost:5432/permitpal?ssl
 goose -dir migrations postgres "$DATABASE_URL" up
 ```
 
-With `DATA_STORE=postgres`, PermitPal reads the applied goose version from `goose_db_version` at startup and exits with an error if it is older than the newest migration the binary was built with. CI deploys new images automatically on pushes to `main`, so apply migrations before merging a change that adds one; otherwise the new replicas refuse to start and Swarm keeps or rolls back to the previous version. When adding a migration, bump `repository.SchemaVersion`; a test fails until it matches `migrations/`.
+With `DATA_STORE=postgres`, PermitPal reads the applied goose version from `goose_db_version` at startup and exits with an error if it is older than the newest migration the binary was built with. CI deploys new images automatically on pushes to `main`, so apply migrations before merging a change that adds one; otherwise the new replicas refuse to start and Swarm keeps or rolls back to the previous version. When adding a migration, bump `repository.SchemaVersion`; a test fails until it matches `migrations/`. Migrations 004 to 006 only add a column, add a constraint and remove the unused seed, so the previous release keeps working on the migrated schema while new replicas roll out.
 
 ## Run with Docker
 

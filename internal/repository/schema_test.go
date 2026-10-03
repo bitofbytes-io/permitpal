@@ -190,3 +190,81 @@ func TestNightHoursConstraintMigration(t *testing.T) {
 		}
 	})
 }
+
+func TestUnusedSeedIsRemovedFromNewInstalls(t *testing.T) {
+	ctx := context.Background()
+	// install applies migrations 001-005 and records them as goose does,
+	// with 001 applied firstApplied before the others.
+	install := func(t *testing.T, firstApplied time.Duration) *pgxpool.Pool {
+		t.Helper()
+		pool := testSchemaPool(t)
+		migrate(t, pool, 1, 5)
+		if _, err := pool.Exec(ctx, `create table goose_db_version (id serial primary key, version_id bigint not null, is_applied boolean not null, tstamp timestamp default now())`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `insert into goose_db_version (version_id, is_applied, tstamp) values (0, true, now() - $1::interval), (1, true, now() - $1::interval), (2, true, now()), (3, true, now()), (4, true, now()), (5, true, now())`, fmt.Sprintf("%d seconds", int(firstApplied.Seconds()))); err != nil {
+			t.Fatal(err)
+		}
+		return pool
+	}
+	calebTracker := func(t *testing.T, pool *pgxpool.Pool) (int, error) {
+		t.Helper()
+		store := NewPostgresStore(pool)
+		driver, err := store.DriverByUsername(ctx, "caleb")
+		if err != nil {
+			return 0, err
+		}
+		tracker, err := store.GetTracker(ctx, driver.ID)
+		return len(tracker.Requirements), err
+	}
+
+	t.Run("new install", func(t *testing.T) {
+		pool := install(t, 0)
+		migrate(t, pool, 6, 6)
+		if _, err := calebTracker(t, pool); err != ErrNotFound {
+			t.Fatalf("seeded caleb driver still present: %v", err)
+		}
+		var rows int
+		if err := pool.QueryRow(ctx, `select (select count(*) from app_profile) + (select count(*) from requirement_items)`).Scan(&rows); err != nil || rows != 0 {
+			t.Fatalf("%d seeded rows left (%v)", rows, err)
+		}
+		if _, err := NewPostgresStore(pool).EnsureDriver(ctx, "caleb", time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		if skills, err := calebTracker(t, pool); err != nil || skills != 17 {
+			t.Fatalf("caleb's first login got %d skills (%v), want a fresh 17", skills, err)
+		}
+	})
+
+	t.Run("original install", func(t *testing.T) {
+		pool := install(t, 150*24*time.Hour)
+		migrate(t, pool, 6, 6)
+		if skills, err := calebTracker(t, pool); err != nil || skills != 13 {
+			t.Fatalf("original tracker has %d skills (%v), want 13", skills, err)
+		}
+	})
+
+	t.Run("new install whose seed was used", func(t *testing.T) {
+		pool := install(t, 0)
+		store := NewPostgresStore(pool)
+		caleb, err := store.DriverByUsername(ctx, "caleb")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.UpdateRequirement(ctx, caleb.ID, model.Requirement{Key: "backing", Rating: model.RatingGood}); err != nil {
+			t.Fatal(err)
+		}
+		migrate(t, pool, 6, 6)
+		if skills, err := calebTracker(t, pool); err != nil || skills != 13 {
+			t.Fatalf("used tracker has %d skills (%v), want 13", skills, err)
+		}
+	})
+
+	t.Run("without goose records", func(t *testing.T) {
+		pool := testSchemaPool(t)
+		migrate(t, pool, 1, 6)
+		if skills, err := calebTracker(t, pool); err != nil || skills != 13 {
+			t.Fatalf("tracker has %d skills (%v), want 13", skills, err)
+		}
+	})
+}
