@@ -76,6 +76,35 @@ func TestDashboardValidation(t *testing.T) {
 					})
 				}
 			}
+			// "now" is 2026-05-01 in the app time zone.
+			for name, test := range map[string]struct {
+				path string
+				form url.Values
+				want string
+			}{
+				"night-over-total":     {"/profile", url.Values{"total_hours": {"4"}, "night_hours": {"4.5"}}, "Night hours cannot be more than total hours"},
+				"future-permit-date":   {"/profile", url.Values{"total_hours": {"4"}, "night_hours": {"1"}, "permit_issue_date": {"2026-05-02"}}, "Permit issue date cannot be in the future"},
+				"future-rated-on-date": {"/requirements/quick-stop", url.Values{"rating": {"good"}, "rated_on": {"2026-05-02"}}, "Last rated date cannot be in the future"},
+			} {
+				t.Run(name, func(t *testing.T) {
+					before := load()
+					rec := submit(test.path, test.form)
+					if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), test.want) {
+						t.Fatalf("status=%d body=%q, want 400 %q", rec.Code, rec.Body.String(), test.want)
+					}
+					if !reflect.DeepEqual(before, load()) {
+						t.Fatal("rejected input changed the tracker")
+					}
+				})
+			}
+			t.Run("today-and-equal-hours-are-allowed", func(t *testing.T) {
+				if rec := submit("/profile", url.Values{"total_hours": {"4"}, "night_hours": {"4"}, "permit_issue_date": {"2026-05-01"}}); rec.Code != http.StatusOK {
+					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+				}
+				if rec := submit("/requirements/quick-stop", url.Values{"rating": {"good"}, "rated_on": {"2026-05-01"}}); rec.Code != http.StatusOK {
+					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+				}
+			})
 			for _, field := range []string{"total_hours", "night_hours"} {
 				for _, value := range []string{"NaN", "Inf", "+Inf", "-Inf", "Infinity", "1.23", "-1", "61"} {
 					t.Run(field+"/"+value, func(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/drywaters/permitpal/internal/model"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -107,4 +108,85 @@ func testSchemaPool(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 	return pool
+}
+
+// migrate applies the Up section of every migration from first through last.
+func migrate(t *testing.T, pool *pgxpool.Pool, first, last int64) {
+	t.Helper()
+	paths, err := filepath.Glob("../../migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range paths {
+		prefix, _, _ := strings.Cut(filepath.Base(path), "_")
+		version, err := strconv.ParseInt(prefix, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if version < first || version > last {
+			continue
+		}
+		migration, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		up, _, _ := strings.Cut(string(migration), "-- +goose Down")
+		if _, err := pool.Exec(context.Background(), up); err != nil {
+			t.Fatalf("apply %s: %v", path, err)
+		}
+	}
+}
+
+func TestNightHoursConstraintMigration(t *testing.T) {
+	ctx := context.Background()
+	constraintValidated := func(t *testing.T, pool *pgxpool.Pool) bool {
+		t.Helper()
+		var validated bool
+		if err := pool.QueryRow(ctx, `select convalidated from pg_constraint where conrelid = 'app_profile'::regclass and conname = 'app_profile_night_hours_within_total'`).Scan(&validated); err != nil {
+			t.Fatal(err)
+		}
+		return validated
+	}
+	saveHours := func(pool *pgxpool.Pool, driverID int64, total, night float64) error {
+		_, err := NewPostgresStore(pool).UpdateProfile(ctx, driverID, model.Profile{TotalHours: total, NightHours: night})
+		return err
+	}
+
+	t.Run("existing data within the rule", func(t *testing.T) {
+		pool := testSchemaPool(t)
+		migrate(t, pool, 1, 4)
+		migrate(t, pool, 5, 5)
+		if !constraintValidated(t, pool) {
+			t.Fatal("constraint was not validated although every row satisfies it")
+		}
+		if err := saveHours(pool, 1, 3, 4); err == nil || !strings.Contains(err.Error(), "app_profile_night_hours_within_total") {
+			t.Fatalf("night hours above total were saved: %v", err)
+		}
+	})
+
+	t.Run("existing row breaks the rule", func(t *testing.T) {
+		pool := testSchemaPool(t)
+		migrate(t, pool, 1, 4)
+		var aiden int64
+		if err := pool.QueryRow(ctx, `insert into drivers (username, display_name) values ('aiden', 'Aiden') returning id`).Scan(&aiden); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := pool.Exec(ctx, `insert into app_profile (driver_id, total_hours, night_hours) values ($1, 3, 5)`, aiden); err != nil {
+			t.Fatal(err)
+		}
+		migrate(t, pool, 5, 5)
+		if constraintValidated(t, pool) {
+			t.Fatal("constraint marked valid over a row that breaks it")
+		}
+		var total, night float64
+		if err := pool.QueryRow(ctx, `select total_hours, night_hours from app_profile where driver_id = $1`, aiden).Scan(&total, &night); err != nil || total != 3 || night != 5 {
+			t.Fatalf("existing row changed to total=%v night=%v (%v)", total, night, err)
+		}
+		if err := saveHours(pool, aiden, 3, 5); err == nil {
+			t.Fatal("re-saving night hours above total was accepted")
+		}
+		if err := saveHours(pool, aiden, 6, 5); err != nil {
+			t.Fatalf("a corrected save failed: %v", err)
+		}
+	})
 }

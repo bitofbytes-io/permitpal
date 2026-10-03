@@ -39,6 +39,15 @@ func (h *DashboardHandler) localNow() time.Time {
 	return h.now().In(h.loc)
 }
 
+// isFuture reports whether date falls after today in the app's time zone.
+func (h *DashboardHandler) isFuture(date *time.Time) bool {
+	if date == nil {
+		return false
+	}
+	year, month, day := h.localNow().Date()
+	return date.After(time.Date(year, month, day, 0, 0, 0, 0, h.loc))
+}
+
 func (h *DashboardHandler) dashboard(driver model.Driver, tracker model.Tracker) model.Dashboard {
 	return model.NewDashboard(driver, tracker.Profile, tracker.Requirements, h.localNow())
 }
@@ -71,10 +80,18 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		http.Error(w, fmt.Sprintf("Night hours must be a number from 0 to %d", maxNightHours), http.StatusBadRequest)
 		return
 	}
+	if nightHours > totalHours {
+		http.Error(w, "Night hours cannot be more than total hours", http.StatusBadRequest)
+		return
+	}
 
 	permitIssueDate, err := model.ParseDate(r.FormValue("permit_issue_date"), h.loc)
 	if err != nil {
 		http.Error(w, "Permit issue date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	if h.isFuture(permitIssueDate) {
+		http.Error(w, "Permit issue date cannot be in the future", http.StatusBadRequest)
 		return
 	}
 
@@ -117,6 +134,10 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 	ratedOn, err := model.ParseDate(r.FormValue("rated_on"), h.loc)
 	if err != nil {
 		http.Error(w, "Last rated date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+	if h.isFuture(ratedOn) {
+		http.Error(w, "Last rated date cannot be in the future", http.StatusBadRequest)
 		return
 	}
 	notes := strings.TrimSpace(r.FormValue("notes"))
