@@ -44,13 +44,13 @@ func TestDashboardValidation(t *testing.T) {
 				router.ServeHTTP(rec, req.WithContext(middleware.WithDriver(req.Context(), driver)))
 				return rec
 			}
-			load := func() model.Dashboard {
+			load := func() model.Tracker {
 				t.Helper()
-				dashboard, err := store.GetDashboard(context.Background(), driver, now)
+				tracker, err := store.GetTracker(context.Background(), driver.ID)
 				if err != nil {
 					t.Fatal(err)
 				}
-				return dashboard
+				return tracker
 			}
 			for _, date := range []string{"not-a-date", "2026-02-30", "2026-13-01", "2026-01-15T12:00:00Z"} {
 				t.Run("invalid-profile-date/"+date, func(t *testing.T) {
@@ -216,7 +216,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			before, err := store.GetDashboard(ctx, caleb, now)
+			before, err := store.GetTracker(ctx, caleb.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,7 +246,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 				if !strings.Contains(rec.Body.String(), `id="practice-focus"`) || !strings.Contains(rec.Body.String(), `hx-swap-oob="outerHTML"`) {
 					t.Fatal("response did not update practice focus out of band")
 				}
-				dash, err := store.GetDashboard(ctx, aiden, now)
+				dash, err := store.GetTracker(ctx, aiden.ID)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -262,7 +262,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 			if rec := submit("/profile", url.Values{"total_hours": {"20"}, "night_hours": {"3"}}); rec.Code != 200 {
 				t.Fatal(rec.Body.String())
 			}
-			after, err := store.GetDashboard(ctx, caleb, now)
+			after, err := store.GetTracker(ctx, caleb.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -315,7 +315,7 @@ func TestConcurrentEnsureDriver(t *testing.T) {
 					t.Fatal("concurrent login created different drivers")
 				}
 			}
-			dash, err := store.GetDashboard(ctx, first, now)
+			dash, err := store.GetTracker(ctx, first.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -356,7 +356,7 @@ func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 			if rec.Code != 200 {
 				t.Fatal(rec.Body.String())
 			}
-			dash, err := store.GetDashboard(ctx, driver, now)
+			dash, err := store.GetTracker(ctx, driver.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -364,7 +364,7 @@ func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 			if req.Rating != model.RatingNotRated || req.RatedOn != nil || req.Notes != "Keep this practice note" {
 				t.Fatalf("cleared requirement=%+v", req)
 			}
-			if len(dash.PracticeFocus) == 0 || dash.PracticeFocus[0].Key != "quick-stop" {
+			if focus := model.NewDashboard(driver, dash.Profile, dash.Requirements, now).PracticeFocus; len(focus) == 0 || focus[0].Key != "quick-stop" {
 				t.Fatal("clear did not restore practice focus")
 			}
 			if strings.Contains(rec.Body.String(), `checked`) || !strings.Contains(rec.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(rec.Body.String(), "Clear rating for Quick stop") {

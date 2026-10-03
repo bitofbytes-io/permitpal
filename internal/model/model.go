@@ -54,6 +54,12 @@ type Requirement struct {
 	UpdatedAt   time.Time
 }
 
+// Tracker is one driver's stored progress: hours, permit date and skill ratings.
+type Tracker struct {
+	Profile      Profile
+	Requirements []Requirement
+}
+
 type Dashboard struct {
 	Driver        Driver
 	Profile       Profile

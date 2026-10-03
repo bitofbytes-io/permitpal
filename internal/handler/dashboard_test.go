@@ -160,11 +160,11 @@ func TestRatingDefaultsToLocalDateLateInTheEvening(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d; body = %q", rec.Code, rec.Body.String())
 	}
-	dashboard, err := store.GetDashboard(context.Background(), driver, now)
+	tracker, err := store.GetTracker(context.Background(), driver.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	requirement, _ := model.RequirementByKey(dashboard.Requirements, "quick-stop")
+	requirement, _ := model.RequirementByKey(tracker.Requirements, "quick-stop")
 	if got := model.DateValue(requirement.RatedOn); got != "2026-09-26" {
 		t.Fatalf("rated on = %q, want the New York date 2026-09-26", got)
 	}
