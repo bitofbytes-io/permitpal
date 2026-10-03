@@ -17,6 +17,14 @@ import (
 const (
 	maxLoginFailures   = 20
 	loginFailureWindow = 15 * time.Minute
+
+	// requestTimeout bounds each request's context, and with it every
+	// database query. The write timeout leaves room to send the 504.
+	requestTimeout    = 10 * time.Second
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 15 * time.Second
+	writeTimeout      = requestTimeout + 5*time.Second
+	idleTimeout       = 2 * time.Minute
 )
 
 type Server struct {
@@ -29,12 +37,25 @@ func New(cfg *config.Config, store repository.Store, logger *slog.Logger) *Serve
 	return &Server{cfg: cfg, store: store, logger: logger}
 }
 
+// HTTPServer returns the listener configuration with every timeout set.
+func (s *Server) HTTPServer() *http.Server {
+	return &http.Server{
+		Addr:              ":" + s.cfg.Port,
+		Handler:           s.Router(),
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
+}
+
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
 	r.Use(middleware.RealIP(s.cfg.TrustedProxies))
 	r.Use(middleware.Logger)
 	r.Use(chimw.Recoverer)
+	r.Use(chimw.Timeout(requestTimeout))
 	r.Use(middleware.RequireSameOrigin)
 	r.Use(middleware.LimitBodyBytes(16 * 1024))
 

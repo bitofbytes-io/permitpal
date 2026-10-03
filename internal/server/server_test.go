@@ -316,3 +316,46 @@ func TestLoginRateLimits(t *testing.T) {
 		assertBlocked(t, login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password"))
 	})
 }
+
+func TestHTTPServerSetsEveryTimeout(t *testing.T) {
+	srv := newTestApp(t).HTTPServer()
+	if srv.ReadHeaderTimeout <= 0 || srv.ReadTimeout <= 0 || srv.WriteTimeout <= 0 || srv.IdleTimeout <= 0 {
+		t.Fatalf("timeouts: header=%v read=%v write=%v idle=%v", srv.ReadHeaderTimeout, srv.ReadTimeout, srv.WriteTimeout, srv.IdleTimeout)
+	}
+	if srv.WriteTimeout <= requestTimeout {
+		t.Fatalf("write timeout %v must outlast the request timeout %v", srv.WriteTimeout, requestTimeout)
+	}
+}
+
+// deadlineStore records the deadline of the context each tracker load receives.
+type deadlineStore struct {
+	repository.Store
+	deadline time.Time
+}
+
+func (s *deadlineStore) GetTracker(ctx context.Context, driverID int64) (model.Tracker, error) {
+	s.deadline, _ = ctx.Deadline()
+	return s.Store.GetTracker(ctx, driverID)
+}
+
+func TestRequestContextHasATimeout(t *testing.T) {
+	app := newTestApp(t)
+	store := &deadlineStore{Store: app.store}
+	app.store = store
+	ts := httptest.NewServer(app.Router())
+	defer ts.Close()
+	client := ts.Client()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Jar = jar
+	start := time.Now()
+	body := readBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"aiden"}, "password": {"test-password"}}))
+	if !strings.Contains(body, "Road Test Skill Checklist") {
+		t.Fatal("login did not reach the dashboard")
+	}
+	if store.deadline.IsZero() || store.deadline.After(start.Add(requestTimeout+time.Second)) {
+		t.Fatalf("store query deadline = %v, want about %v after the request started", store.deadline, requestTimeout)
+	}
+}
