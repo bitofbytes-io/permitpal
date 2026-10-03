@@ -316,3 +316,173 @@ func TestLoginRateLimits(t *testing.T) {
 		assertBlocked(t, login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password"))
 	})
 }
+
+func TestHTTPServerSetsEveryTimeout(t *testing.T) {
+	srv := newTestApp(t).HTTPServer()
+	if srv.ReadHeaderTimeout <= 0 || srv.ReadTimeout <= 0 || srv.WriteTimeout <= 0 || srv.IdleTimeout <= 0 {
+		t.Fatalf("timeouts: header=%v read=%v write=%v idle=%v", srv.ReadHeaderTimeout, srv.ReadTimeout, srv.WriteTimeout, srv.IdleTimeout)
+	}
+	if srv.WriteTimeout <= requestTimeout {
+		t.Fatalf("write timeout %v must outlast the request timeout %v", srv.WriteTimeout, requestTimeout)
+	}
+}
+
+// deadlineStore records the deadline of the context each tracker load receives.
+type deadlineStore struct {
+	repository.Store
+	deadline time.Time
+}
+
+func (s *deadlineStore) GetTracker(ctx context.Context, driverID int64) (model.Tracker, error) {
+	s.deadline, _ = ctx.Deadline()
+	return s.Store.GetTracker(ctx, driverID)
+}
+
+func TestRequestContextHasATimeout(t *testing.T) {
+	app := newTestApp(t)
+	store := &deadlineStore{Store: app.store}
+	app.store = store
+	ts := httptest.NewServer(app.Router())
+	defer ts.Close()
+	client := ts.Client()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Jar = jar
+	start := time.Now()
+	body := readBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"aiden"}, "password": {"test-password"}}))
+	if !strings.Contains(body, "Road Test Skill Checklist") {
+		t.Fatal("login did not reach the dashboard")
+	}
+	if store.deadline.IsZero() || store.deadline.After(start.Add(requestTimeout+time.Second)) {
+		t.Fatalf("store query deadline = %v, want about %v after the request started", store.deadline, requestTimeout)
+	}
+}
+
+func TestPageScriptsCarryTheCSPNonce(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+	res := doGet(t, http.DefaultClient, ts.URL+"/login")
+	csp := res.Header.Get("Content-Security-Policy")
+	body := readBody(t, res)
+	_, rest, ok := strings.Cut(csp, "'nonce-")
+	nonce, _, _ := strings.Cut(rest, "'")
+	if !ok || nonce == "" {
+		t.Fatalf("CSP has no nonce: %q", csp)
+	}
+	// The username Tab handler and the Umami loader are the page's only scripts.
+	if got := strings.Count(body, "<script"); got != 2 || strings.Count(body, `<script nonce="`+nonce+`">`) != 2 {
+		t.Fatalf("want 2 inline scripts with nonce %q, got %d: %s", nonce, got, body)
+	}
+}
+
+func TestStaticFilesServeWithoutDirectoryListings(t *testing.T) {
+	t.Chdir("../..") // The server serves ./static, as in the image.
+	ts := newTestServer(t)
+	defer ts.Close()
+	for path, want := range map[string]int{
+		"/static/styles.css":                          http.StatusOK,
+		"/static/assets/permitpal-logo-mark.png":      http.StatusOK,
+		"/static/":                                    http.StatusNotFound,
+		"/static/assets/":                             http.StatusNotFound,
+		"/static/assets":                              http.StatusNotFound,
+		"/static/assets/permitpal-logo-mark.png/oops": http.StatusNotFound,
+	} {
+		res := doGet(t, http.DefaultClient, ts.URL+path)
+		body := readBody(t, res)
+		if res.StatusCode != want || strings.Contains(body, "<a href=") {
+			t.Fatalf("GET %s: status=%d, want %d; body=%.200s", path, res.StatusCode, want, body)
+		}
+	}
+}
+
+func TestRouterRejectsCrossOriginPosts(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+	client := ts.Client()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Jar = jar
+	closeBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"caleb"}, "password": {"test-password"}}))
+
+	forms := map[string]url.Values{
+		"/login":                    {"username": {"aiden"}, "password": {"test-password"}},
+		"/logout":                   {},
+		"/profile":                  {"total_hours": {"1"}, "night_hours": {"1"}},
+		"/requirements/use-of-lane": {"rating": {"bad"}, "notes": {"cross-site"}},
+	}
+	for name, setOrigin := range map[string]func(*http.Request){
+		"foreign origin":       func(r *http.Request) { r.Header.Set("Origin", "https://attacker.example") },
+		"foreign referer":      func(r *http.Request) { r.Header.Set("Referer", "https://attacker.example/form") },
+		"no origin or referer": func(*http.Request) {},
+	} {
+		for path, form := range forms {
+			t.Run(name+path, func(t *testing.T) {
+				req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ts.URL+path, strings.NewReader(form.Encode()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				setOrigin(req)
+				res, err := client.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if body := readBody(t, res); res.StatusCode != http.StatusForbidden || !strings.Contains(body, "Invalid cross-site request") {
+					t.Fatalf("status=%d body=%q, want 403", res.StatusCode, body)
+				}
+			})
+		}
+	}
+
+	// None of the rejected posts logged Caleb out, switched accounts or changed his tracker.
+	body := readBody(t, doGet(t, client, ts.URL+"/"))
+	if !strings.Contains(body, "Welcome back, Caleb!") || !strings.Contains(body, "56.0 total hours") || strings.Contains(body, "cross-site") {
+		t.Fatalf("a cross-origin post changed state: %s", body)
+	}
+}
+
+func TestLogoutEndsSessionsOnEveryDevice(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+	signIn := func() *http.Client {
+		t.Helper()
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client := &http.Client{Jar: jar}
+		closeBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"caleb"}, "password": {"test-password"}}))
+		return client
+	}
+	signedIn := func(client *http.Client) bool {
+		t.Helper()
+		return strings.Contains(readBody(t, doGet(t, client, ts.URL+"/")), "Welcome back, Caleb!")
+	}
+	phone, laptop := signIn(), signIn()
+	// Keep the laptop's cookie: the browser drops it once the server clears it.
+	laptopURL, _ := url.Parse(ts.URL)
+	laptopCookies := laptop.Jar.Cookies(laptopURL)
+	if !signedIn(phone) || !signedIn(laptop) {
+		t.Fatal("both devices should start signed in")
+	}
+	closeBody(t, doPostForm(t, phone, ts.URL+"/logout", nil))
+	if signedIn(phone) || signedIn(laptop) {
+		t.Fatal("logout left a device signed in")
+	}
+	again := signIn()
+	if !signedIn(again) {
+		t.Fatal("signing in after logout failed")
+	}
+	replay, _ := cookiejar.New(nil)
+	replay.SetCookies(laptopURL, laptopCookies)
+	if signedIn(&http.Client{Jar: replay}) {
+		t.Fatal("a cookie from before the logout still works")
+	}
+	if !signedIn(again) {
+		t.Fatal("the replayed old cookie ended the new session")
+	}
+}

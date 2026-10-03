@@ -16,6 +16,8 @@ import (
 )
 
 const (
+	AppEnvDevelopment      = "development"
+	AppEnvProduction       = "production"
 	DataStoreMemory        = "memory"
 	DataStorePostgres      = "postgres"
 	minSessionSecretLength = 32
@@ -41,7 +43,11 @@ func Load() (*Config, error) {
 	cfg := &Config{}
 	var err error
 
-	cfg.AppEnv = strings.ToLower(strings.TrimSpace(getEnv("APP_ENV", "development")))
+	cfg.AppEnv = strings.ToLower(strings.TrimSpace(getEnv("APP_ENV", AppEnvDevelopment)))
+	// Production turns on the protections, so a typo must not silently fall back to development.
+	if cfg.AppEnv != AppEnvDevelopment && cfg.AppEnv != AppEnvProduction {
+		return nil, fmt.Errorf("APP_ENV must be development or production, got %q", cfg.AppEnv)
+	}
 	cfg.DataStore = strings.ToLower(getEnv("DATA_STORE", defaultDataStore(cfg.AppEnv)))
 	cfg.LogLevel = strings.ToLower(strings.TrimSpace(getEnv("LOG_LEVEL", "info")))
 	cfg.Port = getEnv("PORT", "4600")
@@ -84,7 +90,7 @@ func Load() (*Config, error) {
 		return nil, errors.New("DATABASE_URL is required when DATA_STORE=postgres")
 	}
 
-	if cfg.AppEnv == "production" && cfg.SessionSecret == "" {
+	if cfg.AppEnv == AppEnvProduction && cfg.SessionSecret == "" {
 		return nil, errors.New("SESSION_SECRET is required in production")
 	}
 
@@ -102,14 +108,14 @@ func Load() (*Config, error) {
 }
 
 func defaultDataStore(appEnv string) string {
-	if appEnv == "production" {
+	if appEnv == AppEnvProduction {
 		return DataStorePostgres
 	}
 	return DataStoreMemory
 }
 
 func defaultSecureCookies(appEnv string) string {
-	if appEnv == "production" {
+	if appEnv == AppEnvProduction {
 		return "true"
 	}
 	return "false"

@@ -40,6 +40,14 @@ func (s *MemoryStore) DriverByUsername(_ context.Context, username string) (mode
 	}
 	return model.Driver{}, ErrNotFound
 }
+func (s *MemoryStore) EndSessions(_ context.Context, username string, generation int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if state, ok := s.drivers[username]; ok && state.driver.SessionGeneration == generation {
+		state.driver.SessionGeneration++
+	}
+	return nil
+}
 func (s *MemoryStore) stateByID(id int64) *driverState {
 	for _, state := range s.drivers {
 		if state.driver.ID == id {
@@ -62,18 +70,18 @@ func copyRequirement(req model.Requirement) model.Requirement {
 	}
 	return req
 }
-func (s *MemoryStore) GetDashboard(_ context.Context, driver model.Driver, now time.Time) (model.Dashboard, error) {
+func (s *MemoryStore) GetTracker(_ context.Context, driverID int64) (model.Tracker, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	state := s.stateByID(driver.ID)
+	state := s.stateByID(driverID)
 	if state == nil {
-		return model.Dashboard{}, ErrNotFound
+		return model.Tracker{}, ErrNotFound
 	}
 	requirements := make([]model.Requirement, len(state.requirements))
 	for i, req := range state.requirements {
 		requirements[i] = copyRequirement(req)
 	}
-	return model.NewDashboard(state.driver, copyProfile(state.profile), requirements, now), nil
+	return model.Tracker{Profile: copyProfile(state.profile), Requirements: requirements}, nil
 }
 func (s *MemoryStore) UpdateProfile(_ context.Context, driverID int64, profile model.Profile) (model.Profile, error) {
 	s.mu.Lock()

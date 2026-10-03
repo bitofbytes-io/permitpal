@@ -39,26 +39,33 @@ func (h *DashboardHandler) localNow() time.Time {
 	return h.now().In(h.loc)
 }
 
+// isFuture reports whether date falls after today in the app's time zone.
+func (h *DashboardHandler) isFuture(date *time.Time) bool {
+	if date == nil {
+		return false
+	}
+	year, month, day := h.localNow().Date()
+	return date.After(time.Date(year, month, day, 0, 0, 0, 0, h.loc))
+}
+
+func (h *DashboardHandler) dashboard(driver model.Driver, tracker model.Tracker) model.Dashboard {
+	return model.NewDashboard(driver, tracker.Profile, tracker.Requirements, h.localNow())
+}
+
+// These handlers run behind RequireAuth, which always puts the driver in the context.
+
 func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
-	driver, ok := middleware.DriverFromContext(r.Context())
-	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
-	dashboard, err := h.store.GetDashboard(r.Context(), driver, h.localNow())
+	driver, _ := middleware.DriverFromContext(r.Context())
+	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
 	if err != nil {
-		http.Error(w, "Unable to load dashboard", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to load dashboard", err)
 		return
 	}
-	render(w, r, ui.DashboardPage(dashboard))
+	render(w, r, ui.DashboardPage(h.dashboard(driver, tracker)))
 }
 
 func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	driver, ok := middleware.DriverFromContext(r.Context())
-	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	driver, _ := middleware.DriverFromContext(r.Context())
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to read progress form", http.StatusBadRequest)
 		return
@@ -73,41 +80,44 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		http.Error(w, fmt.Sprintf("Night hours must be a number from 0 to %d", maxNightHours), http.StatusBadRequest)
 		return
 	}
+	if nightHours > totalHours {
+		http.Error(w, "Night hours cannot be more than total hours", http.StatusBadRequest)
+		return
+	}
 
 	permitIssueDate, err := model.ParseDate(r.FormValue("permit_issue_date"), h.loc)
 	if err != nil {
 		http.Error(w, "Permit issue date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
 	}
-
-	current, err := h.store.GetDashboard(r.Context(), driver, h.localNow())
-	if err != nil {
-		http.Error(w, "Unable to load profile", http.StatusInternalServerError)
+	if h.isFuture(permitIssueDate) {
+		http.Error(w, "Permit issue date cannot be in the future", http.StatusBadRequest)
 		return
 	}
 
-	profile := current.Profile
+	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
+	if err != nil {
+		middleware.ServerError(w, r, "Unable to load profile", err)
+		return
+	}
+
+	profile := tracker.Profile
 	profile.TotalHours = totalHours
 	profile.NightHours = nightHours
 	profile.PermitIssueDate = permitIssueDate
 
-	profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile)
+	tracker.Profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile)
 	if err != nil {
-		http.Error(w, "Unable to save progress", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to save progress", err)
 		return
 	}
 
-	updated := model.NewDashboard(driver, profile, current.Requirements, h.localNow())
-	slog.Info("profile updated", "total_hours", profile.TotalHours, "night_hours", profile.NightHours, "has_permit_issue_date", profile.PermitIssueDate != nil)
-	render(w, r, ui.ProgressPanelWithMessage(updated, "Progress saved"))
+	slog.Info("profile updated", "total_hours", tracker.Profile.TotalHours, "night_hours", tracker.Profile.NightHours, "has_permit_issue_date", tracker.Profile.PermitIssueDate != nil)
+	render(w, r, ui.ProgressPanelWithMessage(h.dashboard(driver, tracker), "Progress saved"))
 }
 
 func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Request) {
-	driver, ok := middleware.DriverFromContext(r.Context())
-	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	driver, _ := middleware.DriverFromContext(r.Context())
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to read requirement form", http.StatusBadRequest)
 		return
@@ -126,18 +136,24 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Last rated date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
 	}
+	// Clearing discards the date, so a future date saved before this check
+	// must not block it.
+	if rating != model.RatingNotRated && h.isFuture(ratedOn) {
+		http.Error(w, "Last rated date cannot be in the future", http.StatusBadRequest)
+		return
+	}
 	notes := strings.TrimSpace(r.FormValue("notes"))
 	if utf8.RuneCountInString(notes) > maxNotesChars {
 		http.Error(w, fmt.Sprintf("Notes must be %d characters or fewer", maxNotesChars), http.StatusBadRequest)
 		return
 	}
 	key := chi.URLParam(r, "key")
-	current, err := h.store.GetDashboard(r.Context(), driver, h.localNow())
+	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
 	if err != nil {
-		http.Error(w, "Unable to load requirement", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to load requirement", err)
 		return
 	}
-	existing, ok := model.RequirementByKey(current.Requirements, key)
+	existing, ok := model.RequirementByKey(tracker.Requirements, key)
 	if !ok {
 		http.NotFound(w, r)
 		return
@@ -159,11 +175,12 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 			http.NotFound(w, r)
 			return
 		}
-		http.Error(w, "Unable to save requirement", http.StatusInternalServerError)
+		middleware.ServerError(w, r, "Unable to save requirement", err)
 		return
 	}
 	slog.Info("requirement updated", "requirement", updated.Key, "status", updated.Rating, "has_rated_on", updated.RatedOn != nil)
-	render(w, r, ui.RequirementUpdate(updated, model.NewDashboard(driver, current.Profile, replaceRequirement(current.Requirements, updated), h.localNow())))
+	tracker.Requirements = replaceRequirement(tracker.Requirements, updated)
+	render(w, r, ui.RequirementUpdate(updated, h.dashboard(driver, tracker)))
 }
 
 func parseHours(value string, max float64) (float64, error) {

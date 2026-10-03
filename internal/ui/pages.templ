@@ -2,22 +2,27 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/drywaters/permitpal/internal/model"
 )
 
+// pageHead renders the shared <head>; children go before the Umami loader.
+templ pageHead(title string) {
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1"/>
+		<title>{ title }</title>
+		<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
+		<link rel="stylesheet" href="/static/styles.css"/>
+		{ children... }
+		@UmamiScript()
+	</head>
+}
+
 templ LoginPage(errorMessage, username string) {
 	<!doctype html>
 	<html lang="en" class="login-page">
-		<head>
-			<meta charset="utf-8"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>PermitPal</title>
-			<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
-			<link rel="stylesheet" href="/static/styles.css"/>
-			@UmamiScript()
-		</head>
+		@pageHead("PermitPal")
 		<body class="login-body">
 			<main class="login-shell">
 				<section class="login-panel" aria-label="Sign in">
@@ -35,7 +40,7 @@ templ LoginPage(errorMessage, username string) {
 					</form>
 				</section>
 			</main>
-			<script>
+			<script nonce={ templ.GetNonce(ctx) }>
 				// Password managers such as 1Password insert a focusable button inside the
 				// username field, so Tab would stop there instead of reaching the password.
 				document.getElementById("username").addEventListener("keydown", function (event) {
@@ -52,15 +57,9 @@ templ LoginPage(errorMessage, username string) {
 templ DashboardPage(dashboard model.Dashboard) {
 	<!doctype html>
 	<html lang="en">
-		<head>
-			<meta charset="utf-8"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1"/>
-			<title>PermitPal Dashboard</title>
-			<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
-			<link rel="stylesheet" href="/static/styles.css"/>
+		@pageHead("PermitPal Dashboard") {
 			<script src="/static/htmx.min.js" defer></script>
-			@UmamiScript()
-		</head>
+		}
 		<body>
 			<header class="dash-header">
 				<a class="dash-brand" href="/" aria-label="PermitPal home">
@@ -139,7 +138,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 }
 
 templ UmamiScript() {
-	<script>
+	<script nonce={ templ.GetNonce(ctx) }>
 		(function () {
 			if (window.location.hostname !== "permitpal.bitofbytes.io") {
 				return;
@@ -160,53 +159,17 @@ templ ProgressPanel(dashboard model.Dashboard) {
 
 templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 	<section id="progress-panel" class="progress-panel" aria-label="Current progress">
-		<div class="metric odometer-metric">
-			<h2>Current hours</h2>
-			<div class="odometer-line">
-				<div class="odometer" aria-label={ model.FormatHours(dashboard.Profile.TotalHours) + " total hours" }>
-					for _, char := range odometerChars(dashboard.Profile.TotalHours) {
-						if char == "." {
-							<span class="odo-dot">.</span>
-						} else {
-							<span>{ char }</span>
-						}
-					}
-				</div>
-				<strong>/ 60</strong>
-			</div>
-			<div class="road-meter" style={ progressStyle(dashboard.TotalPercent) }>
-				<span class="road-fill"></span>
-				<span class="road-marker">{ model.FormatHours(dashboard.Profile.TotalHours) }</span>
-			</div>
-		</div>
-		<div class="metric odometer-metric">
-			<h2>Night hours</h2>
-			<div class="odometer-line">
-				<div class="odometer" aria-label={ model.FormatHours(dashboard.Profile.NightHours) + " night hours" }>
-					for _, char := range odometerChars(dashboard.Profile.NightHours) {
-						if char == "." {
-							<span class="odo-dot">.</span>
-						} else {
-							<span>{ char }</span>
-						}
-					}
-				</div>
-				<strong>/ 10</strong>
-			</div>
-			<div class="road-meter" style={ progressStyle(dashboard.NightPercent) }>
-				<span class="road-fill"></span>
-				<span class="road-marker">{ model.FormatHours(dashboard.Profile.NightHours) }</span>
-			</div>
-		</div>
+		@hoursGauge("Current hours", "total hours", dashboard.Profile.TotalHours, model.TotalHoursRequired, dashboard.TotalPercent)
+		@hoursGauge("Night hours", "night hours", dashboard.Profile.NightHours, model.NightHoursRequired, dashboard.NightPercent)
 		<div class="estimate-sign">
 			<h2>Ready estimate</h2>
 			<div class="estimate-face">
 				<div class="calendar-icon" aria-hidden="true"></div>
-				if estimatePrefix, estimateDate, ok := strings.Cut(dashboard.ReadyEstimate, " for "); ok {
-					<span>{ estimatePrefix } for</span>
-					<strong class="estimate-date">{ estimateDate }</strong>
+				if date := dashboard.ReadyEstimate.Date; date != nil {
+					<span>On pace for</span>
+					<strong class="estimate-date">{ date.Format("January 2, 2006") }</strong>
 				} else {
-					<strong>{ dashboard.ReadyEstimate }</strong>
+					<strong>{ dashboard.ReadyEstimate.Hint }</strong>
 				}
 			</div>
 			if savedMessage != "" {
@@ -214,6 +177,28 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 			}
 		</div>
 	</section>
+}
+
+templ hoursGauge(heading, unit string, hours, required float64, percent int) {
+	<div class="metric odometer-metric">
+		<h2>{ heading }</h2>
+		<div class="odometer-line">
+			<div class="odometer" aria-label={ model.FormatHours(hours) + " " + unit }>
+				for _, char := range odometerChars(hours) {
+					if char == "." {
+						<span class="odo-dot">.</span>
+					} else {
+						<span>{ char }</span>
+					}
+				}
+			</div>
+			<strong>{ fmt.Sprintf("/ %g", required) }</strong>
+		</div>
+		<div class="road-meter" style={ progressStyle(percent) }>
+			<span class="road-fill"></span>
+			<span class="road-marker">{ model.FormatHours(hours) }</span>
+		</div>
+	</div>
 }
 
 templ RequirementRow(req model.Requirement) {

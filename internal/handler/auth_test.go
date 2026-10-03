@@ -2,6 +2,8 @@ package handler
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -61,5 +63,28 @@ func TestLoginRejectsInvalidUsernamesWithoutUsernameBuckets(t *testing.T) {
 	// The three invalid attempts used only the verified client IP's bucket.
 	if rec := post("aiden"); rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("status=%d, want 429 once invalid usernames exhaust the IP limit", rec.Code)
+	}
+}
+
+type failingLogoutStore struct{ repository.Store }
+
+func (failingLogoutStore) EndSessions(context.Context, string, int64) error {
+	return errors.New("database unavailable")
+}
+
+func TestLogoutKeepsTheCookieWhenSessionsCannotEnd(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("test-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := auth.NewManager(&config.Config{Users: map[string]string{"aiden": string(hash)}, SessionSecret: "test-session-secret-32-chars-ok", SessionCookie: "permitpal_session"})
+	session := httptest.NewRecorder()
+	manager.SetSession(session, "aiden", 0)
+	req := httptest.NewRequest(http.MethodPost, "/logout", nil)
+	req.AddCookie(session.Result().Cookies()[0])
+	rec := httptest.NewRecorder()
+	NewAuthHandler(manager, failingLogoutStore{}, auth.NewLoginLimiter(3, time.Minute)).Logout(rec, req)
+	if rec.Code != http.StatusInternalServerError || len(rec.Result().Cookies()) != 0 {
+		t.Fatalf("status=%d cookies=%v; want 500 and the cookie kept for a retry", rec.Code, rec.Result().Cookies())
 	}
 }

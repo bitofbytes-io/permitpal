@@ -26,6 +26,9 @@ type Driver struct {
 	ID          int64
 	Username    string
 	DisplayName string
+	// SessionGeneration is the generation a session cookie must carry;
+	// logout increments it.
+	SessionGeneration int64
 }
 
 func NewDriver(username string) Driver {
@@ -54,12 +57,18 @@ type Requirement struct {
 	UpdatedAt   time.Time
 }
 
+// Tracker is one driver's stored progress: hours, permit date and skill ratings.
+type Tracker struct {
+	Profile      Profile
+	Requirements []Requirement
+}
+
 type Dashboard struct {
 	Driver        Driver
 	Profile       Profile
 	Requirements  []Requirement
 	PracticeFocus []Requirement
-	ReadyEstimate string
+	ReadyEstimate ReadyEstimate
 	TotalPercent  int
 	NightPercent  int
 	GoodCount     int
@@ -95,32 +104,39 @@ func Percent(value, target float64) int {
 	return int(math.Max(0, math.Min(99, math.Floor(value/target*100))))
 }
 
-func EstimateReadyDate(profile Profile, now time.Time) string {
+// ReadyEstimate is the projected date the hour requirements will be met, or,
+// when there is none, a hint about what the driver should do next.
+type ReadyEstimate struct {
+	Date *time.Time
+	Hint string
+}
+
+func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	if profile.PermitIssueDate == nil {
-		return "Add permit issue date to estimate"
+		return ReadyEstimate{Hint: "Add permit issue date to estimate"}
 	}
 	startDate := startOfDay(*profile.PermitIssueDate)
 	today := startOfDay(now)
 	if !today.After(startDate) {
-		return "Add hours to estimate"
+		return ReadyEstimate{Hint: "Add hours to estimate"}
 	}
 
 	readyDate, ok := projectedRequirementDate(startDate, today, profile.TotalHours, TotalHoursRequired)
 	if !ok {
-		return "Add hours to estimate"
+		return ReadyEstimate{Hint: "Add hours to estimate"}
 	}
 
 	nightDate, ok := projectedRequirementDate(startDate, today, profile.NightHours, NightHoursRequired)
 	if !ok {
-		return "Add night hours to estimate"
+		return ReadyEstimate{Hint: "Add night hours to estimate"}
 	}
 	if nightDate.After(readyDate) {
 		readyDate = nightDate
 	}
 	if !readyDate.After(today) {
-		return "Ready when every skill is rated Good"
+		return ReadyEstimate{Hint: "Ready when every skill is rated Good"}
 	}
-	return "On pace for " + readyDate.Format("January 2, 2006")
+	return ReadyEstimate{Date: &readyDate}
 }
 
 func FormatHours(hours float64) string {
