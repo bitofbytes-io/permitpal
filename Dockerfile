@@ -31,7 +31,6 @@ ENV PORT=4600
 ENV APP_ENV=production
 ENV DATA_STORE=postgres
 ENV DATABASE_URL_FILE=/run/secrets/permitpal_database_url
-ENV PERMITPAL_PASSWORD_HASH_FILE=/run/secrets/permitpal_password_hash
 ENV SESSION_SECRET_FILE=/run/secrets/permitpal_session_secret
 
 USER permitpal

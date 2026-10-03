@@ -6,13 +6,12 @@ PermitPal is a self-hosted Go dashboard for tracking progress toward the North C
 
 - Docker 24+
 - PostgreSQL 15+ for persistent deployments
-- Apache `htpasswd` for generating a production bcrypt password hash
+- Apache `htpasswd` for generating bcrypt users entries
 - Goose for database migrations
 
 ## Build the image
 
 ```bash
-make tail-prod
 docker build -t permitpal:local .
 ```
 
@@ -38,24 +37,20 @@ APP_ENV=production
 DATA_STORE=postgres
 DATABASE_URL=postgres://permitpal:change-me@db:5432/permitpal?sslmode=disable
 PERMITPAL_USERS_FILE=/run/secrets/permitpal_users
-PERMITPAL_PASSWORD_HASH_FILE=
 SESSION_SECRET=replace-with-a-32-character-or-longer-session-secret
 PORT=4600
 SECURE_COOKIES=true
 ```
 
-For users-file-only deployments, remove the old secret mount at `/run/secrets/permitpal_password_hash` and clear `PERMITPAL_PASSWORD_HASH`, `PERMITPAL_PASSWORD_HASH_FILE`, `PERMITPAL_PASSWORD`, and `PERMITPAL_PASSWORD_FILE`. An explicitly empty `*_FILE` setting disables the default file fallback; an unset setting allows the optional default file to load. Remove the legacy `PERMITPAL_USERNAME` setting too; usernames come from the users file. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
+Accounts come only from `PERMITPAL_USERS` or the users file. An explicitly empty `*_FILE` setting disables the default file fallback; an unset setting allows the optional default file to load. Keep secure cookies enabled behind HTTPS. For local HTTP development, use `APP_ENV=development` and `SECURE_COOKIES=false`.
 
 | Setting | Required | Purpose |
 | --- | --- | --- |
 | `APP_ENV` | No | Docker defaults to `production`; local runs default to `development` |
 | `DATA_STORE` | No | Docker defaults to `postgres`; development defaults to `memory` |
 | `DATABASE_URL` | With Postgres | PostgreSQL connection string |
-| `PERMITPAL_USERS` / `PERMITPAL_USERS_FILE` | Users or legacy hash in production | Newline-separated `username:bcrypthash` entries; the optional default file is `/run/secrets/permitpal_users` |
-| `PERMITPAL_PASSWORD_HASH` | Alternative credential | Legacy bcrypt hash paired with `PERMITPAL_USERNAME` |
-| `PERMITPAL_PASSWORD` | Development only | Plaintext legacy alternative; rejected in production |
+| `PERMITPAL_USERS` / `PERMITPAL_USERS_FILE` | Yes | Newline-separated `username:bcrypthash` entries; the optional default file is `/run/secrets/permitpal_users` |
 | `SESSION_SECRET` | Yes | Session-signing secret of at least 32 characters |
-| `PERMITPAL_USERNAME` | Legacy account only | Defaults to `driver`; choose `caleb` to access migrated history |
 | `SESSION_COOKIE` | No | Cookie name; defaults to `permitpal_session` |
 | `SECURE_COOKIES` | No | Defaults to `true` in production and `false` in development |
 | `PORT` | No | HTTP port; defaults to `4600` |
@@ -65,7 +60,7 @@ For users-file-only deployments, remove the old secret mount at `/run/secrets/pe
 
 Failed logins are limited to 20 per username and, when the real client IP is known, 20 per client IP in a 15-minute window; further attempts get HTTP 429 with `Retry-After` until the window ends, and a successful login clears that username's failures. Counters are in memory per replica and reset on restart. The per-IP limit applies only when `TRUSTED_PROXY_CIDRS` is set: a peer outside those CIDRs is a direct client keyed by its TCP address, and a peer inside them is keyed by the rightmost `X-Forwarded-For` address that is not a trusted proxy. With `TRUSTED_PROXY_CIDRS` empty, or when a trusted proxy sends no usable `X-Forwarded-For`, only the username limit applies. The username limit lets anyone lock a known username out for 15 minutes. A username that cannot exist under the rule below fails without a password check and counts only toward the per-IP limit. The limiter tracks at most 10,000 keys and evicts the oldest window beyond that. Behind Traefik on a Docker Swarm overlay network, set `TRUSTED_PROXY_CIDRS` to that network's subnet, for example the output of `docker network inspect proxy --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'`.
 
-Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames across users entries and the legacy account are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, password, password hash, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
+Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
 
 ## Database and migrations
 
@@ -105,21 +100,19 @@ docker run --rm --name permitpal --network permitpal \
 
 Open <http://localhost:4600>. The health endpoint is <http://localhost:4600/health>.
 
-For a disposable preview, clear the production secret paths:
+For a disposable preview, clear the production database secret path and pass a users line:
 
 ```bash
 docker run --rm -p 4600:4600 \
   -e APP_ENV=development \
   -e DATA_STORE=memory \
   -e DATABASE_URL_FILE= \
-  -e PERMITPAL_PASSWORD_HASH_FILE= \
-  -e PERMITPAL_USERS_FILE= \
-  -e PERMITPAL_PASSWORD=local-password \
+  -e PERMITPAL_USERS="$(htpasswd -nB driver)" \
   -e SESSION_SECRET=replace-with-a-32-character-or-longer-secret \
   permitpal:local
 ```
 
-Postgres and migrations are not needed in this mode. Log in as `driver`; all preview data disappears on restart.
+Postgres and migrations are not needed in this mode. `htpasswd` prompts for the preview password. Log in as `driver` with that password; all preview data disappears on restart.
 
 ## Development
 
@@ -133,9 +126,9 @@ Use `make run-postgres` for a persistent local run and the `make migrate*` targe
 
 ## Upgrade an existing tracker
 
-Back up Postgres before applying migration 003. Stop the old application during the schema change because the old binary cannot read the new schema. Run `DATABASE_URL=... make migrate`, then deploy the new image with the users secret. Remove the legacy password-hash secret mount and clear the legacy credential variables listed above so the old account is not loaded alongside the users file. Migrations remain a manual deploy step.
+Back up Postgres before applying migration 003. Stop the old application during the schema change because the old binary cannot read the new schema. Run `DATABASE_URL=... make migrate`, then deploy the new image with the users secret. PermitPal no longer reads the old single-account settings (`PERMITPAL_PASSWORD`, `PERMITPAL_PASSWORD_HASH`, their `*_FILE` variants, and `PERMITPAL_USERNAME`), so remove them and the old password-hash secret mount. Migrations remain a manual deploy step.
 
-The old `driver` login and its cookies stop working when only `caleb` and `aiden` are configured. Caleb logs in as `caleb` with his existing password; Aiden logs in as `aiden` and sets his permit issue date. Preserve Caleb's current bcrypt hash in the users file if his password should remain unchanged. His saved mastered ratings become Good, and needs-practice ratings become Fair. Rated dates and notes are preserved.
+Only accounts in the users file can sign in, so the old `driver` login and its cookies stop working unless `driver` is added there. Caleb logs in as `caleb` with his existing password; Aiden logs in as `aiden` and sets his permit issue date. Preserve Caleb's current bcrypt hash in the users file if his password should remain unchanged. His saved mastered ratings become Good, and needs-practice ratings become Fair. Rated dates and notes are preserved.
 
 Migration 003 can be reversed on a scratch database with `make migrate-down` then `make migrate`. A downgrade deliberately deletes all drivers except Caleb and maps Good to mastered and other ratings to needs-practice. Do not downgrade production without a backup and an explicit decision to discard other drivers' data.
 
