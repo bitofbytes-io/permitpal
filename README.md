@@ -107,12 +107,12 @@ docker run --rm -p 4600:4600 \
   -e APP_ENV=development \
   -e DATA_STORE=memory \
   -e DATABASE_URL_FILE= \
-  -e PERMITPAL_USERS="$(htpasswd -nbB driver local-password)" \
+  -e PERMITPAL_USERS="$(htpasswd -nB driver)" \
   -e SESSION_SECRET=replace-with-a-32-character-or-longer-secret \
   permitpal:local
 ```
 
-Postgres and migrations are not needed in this mode. Log in as `driver` with `local-password`; all preview data disappears on restart.
+Postgres and migrations are not needed in this mode. `htpasswd` prompts for the preview password. Log in as `driver` with that password; all preview data disappears on restart.
 
 ## Development
 

@@ -7,9 +7,9 @@ DATA_STORE := memory
 # Set credentials in your untracked local.mk before running make dev or make run-postgres.
 # Prefer a private htpasswd file for separate local accounts.
 PERMITPAL_USERS_FILE :=
-# Or use one users line. This preview account logs in as driver / local-password.
-# Inline bcrypt hashes in Make files require each $ to be escaped as $$.
-PERMITPAL_USERS := $(shell htpasswd -nbB driver local-password)
+# Or use one users line. Create a preview account with `htpasswd -nB driver`
+# and paste its output here; each $ in the hash must be escaped as $$.
+PERMITPAL_USERS :=
 SESSION_SECRET :=
 
 # Used by make run-postgres and migration targets.
