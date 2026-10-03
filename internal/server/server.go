@@ -56,6 +56,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.Logger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(requestTimeout))
+	r.Use(middleware.SecurityHeaders)
 	r.Use(middleware.RequireSameOrigin)
 	r.Use(middleware.LimitBodyBytes(16 * 1024))
 
@@ -65,7 +66,7 @@ func (s *Server) Router() http.Handler {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	fileServer := http.FileServer(http.Dir("static"))
+	fileServer := http.FileServer(filesOnly{http.Dir("static")})
 	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
 
 	authManager := auth.NewManager(s.cfg)

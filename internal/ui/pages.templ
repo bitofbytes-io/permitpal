@@ -40,7 +40,7 @@ templ LoginPage(errorMessage, username string) {
 					</form>
 				</section>
 			</main>
-			<script>
+			<script nonce={ templ.GetNonce(ctx) }>
 				// Password managers such as 1Password insert a focusable button inside the
 				// username field, so Tab would stop there instead of reaching the password.
 				document.getElementById("username").addEventListener("keydown", function (event) {
@@ -138,7 +138,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 }
 
 templ UmamiScript() {
-	<script>
+	<script nonce={ templ.GetNonce(ctx) }>
 		(function () {
 			if (window.location.hostname !== "permitpal.bitofbytes.io") {
 				return;
