@@ -128,7 +128,7 @@ Use `make run-postgres` for a persistent local run and the `make migrate*` targe
 
 Back up Postgres before applying migration 003. Stop the old application during the schema change because the old binary cannot read the new schema. Run `DATABASE_URL=... make migrate`, then deploy the new image with the users secret. PermitPal no longer reads the old single-account settings (`PERMITPAL_PASSWORD`, `PERMITPAL_PASSWORD_HASH`, their `*_FILE` variants, and `PERMITPAL_USERNAME`), so remove them and the old password-hash secret mount. Migrations remain a manual deploy step.
 
-The old `driver` login and its cookies stop working; only accounts in the users file can sign in. Caleb logs in as `caleb` with his existing password; Aiden logs in as `aiden` and sets his permit issue date. Preserve Caleb's current bcrypt hash in the users file if his password should remain unchanged. His saved mastered ratings become Good, and needs-practice ratings become Fair. Rated dates and notes are preserved.
+Only accounts in the users file can sign in, so the old `driver` login and its cookies stop working unless `driver` is added there. Caleb logs in as `caleb` with his existing password; Aiden logs in as `aiden` and sets his permit issue date. Preserve Caleb's current bcrypt hash in the users file if his password should remain unchanged. His saved mastered ratings become Good, and needs-practice ratings become Fair. Rated dates and notes are preserved.
 
 Migration 003 can be reversed on a scratch database with `make migrate-down` then `make migrate`. A downgrade deliberately deletes all drivers except Caleb and maps Good to mastered and other ratings to needs-practice. Do not downgrade production without a backup and an explicit decision to discard other drivers' data.
 
