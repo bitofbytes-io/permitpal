@@ -14,7 +14,7 @@ func TestEstimateReadyDateUsesAveragePaceFromStartDate(t *testing.T) {
 	}
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)
 
-	got := EstimateReadyDate(profile, now)
+	got := estimateText(EstimateReadyDate(profile, now))
 	if got != "On pace for November 25, 2026" {
 		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "On pace for November 25, 2026")
 	}
@@ -29,7 +29,7 @@ func TestEstimateReadyDateRequiresNightHours(t *testing.T) {
 	}
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.Local)
 
-	got := EstimateReadyDate(profile, now)
+	got := estimateText(EstimateReadyDate(profile, now))
 	if got != "Add night hours to estimate" {
 		t.Fatalf("EstimateReadyDate() = %q, want %q", got, "Add night hours to estimate")
 	}
@@ -70,7 +70,7 @@ func TestEstimateUsesLocalDateLateInTheEvening(t *testing.T) {
 	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 9, 26, 23, 30, 0, 0, loc)
 	profile := Profile{PermitIssueDate: &start, TotalHours: 25, NightHours: 10}
-	if got := EstimateReadyDate(profile, now); got != "On pace for October 31, 2026" {
+	if got := estimateText(EstimateReadyDate(profile, now)); got != "On pace for October 31, 2026" {
 		t.Fatalf("EstimateReadyDate() = %q, want pace from 25 elapsed days", got)
 	}
 }
@@ -101,8 +101,8 @@ func TestNewDriverDefaultsAndFocus(t *testing.T) {
 	if dash.Driver.DisplayName != "Aiden" || dash.GoodCount != 1 || dash.PracticeFocus[0].SortOrder != 10 || dash.PracticeFocus[1].SortOrder != 11 || dash.PracticeFocus[2].SortOrder != 6 {
 		t.Fatalf("dashboard=%+v", dash)
 	}
-	if dash.ReadyEstimate != "Add permit issue date to estimate" {
-		t.Fatal(dash.ReadyEstimate)
+	if dash.ReadyEstimate != (ReadyEstimate{Hint: "Add permit issue date to estimate"}) {
+		t.Fatalf("%+v", dash.ReadyEstimate)
 	}
 	if rating, ok := ParseRating(""); !ok || rating != RatingNotRated {
 		t.Fatal("empty rating should be not rated")
@@ -112,12 +112,20 @@ func TestEstimateUsesLaterNightProjection(t *testing.T) {
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	now := start.AddDate(0, 0, 30)
 	profile := Profile{PermitIssueDate: &start, TotalHours: 30, NightHours: 2}
-	if got := EstimateReadyDate(profile, now); got != "On pace for May 31, 2026" {
+	if got := estimateText(EstimateReadyDate(profile, now)); got != "On pace for May 31, 2026" {
 		t.Fatal(got)
 	}
 	profile.TotalHours = 60
 	profile.NightHours = 10
-	if got := EstimateReadyDate(profile, now); got != "Ready when every skill is rated Good" {
+	if got := estimateText(EstimateReadyDate(profile, now)); got != "Ready when every skill is rated Good" {
 		t.Fatal(got)
 	}
+}
+
+// estimateText renders an estimate the way the dashboard shows it.
+func estimateText(estimate ReadyEstimate) string {
+	if estimate.Date != nil {
+		return "On pace for " + estimate.Date.Format("January 2, 2006")
+	}
+	return estimate.Hint
 }
