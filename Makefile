@@ -5,11 +5,8 @@ PORT ?= 4600
 APP_ENV ?= development
 DATA_STORE ?= memory
 export DATABASE_URL
-export PERMITPAL_PASSWORD
 export PERMITPAL_USERS
 export PERMITPAL_USERS_FILE
-export PERMITPAL_USERNAME
-export PERMITPAL_PASSWORD_HASH
 export SESSION_SECRET
 
 REGISTRY ?= registry.tail209cfc.ts.net
@@ -38,14 +35,14 @@ tail-prod: ## Build CSS for production, or copy source CSS if Tailwind is unavai
 	fi
 
 dev: templ tail-prod ## Run local visual preview with memory storage and no database
-	@test -n "$$PERMITPAL_PASSWORD$$PERMITPAL_PASSWORD_HASH$$PERMITPAL_USERS$$PERMITPAL_USERS_FILE" || (echo "PERMITPAL_USERS_FILE, PERMITPAL_USERS, PERMITPAL_PASSWORD or PERMITPAL_PASSWORD_HASH must be set in local.mk or the environment" >&2; exit 1)
+	@test -n "$$PERMITPAL_USERS$$PERMITPAL_USERS_FILE" || (echo "PERMITPAL_USERS_FILE or PERMITPAL_USERS must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(SESSION_SECRET)' || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
 	APP_ENV=development DATA_STORE=memory PORT=$(PORT) go run ./cmd/permitpal
 
 run: dev ## Alias for local preview
 
 run-postgres: templ tail-prod ## Run locally against Postgres
-	@test -n "$$PERMITPAL_PASSWORD$$PERMITPAL_PASSWORD_HASH$$PERMITPAL_USERS$$PERMITPAL_USERS_FILE" || (echo "PERMITPAL_USERS_FILE, PERMITPAL_USERS, PERMITPAL_PASSWORD or PERMITPAL_PASSWORD_HASH must be set in local.mk or the environment" >&2; exit 1)
+	@test -n "$$PERMITPAL_USERS$$PERMITPAL_USERS_FILE" || (echo "PERMITPAL_USERS_FILE or PERMITPAL_USERS must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(SESSION_SECRET)' || (echo "SESSION_SECRET must be set in local.mk or the environment" >&2; exit 1)
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)
 	APP_ENV=$(APP_ENV) DATA_STORE=postgres PORT=$(PORT) DATABASE_URL="$(DATABASE_URL)" go run ./cmd/permitpal

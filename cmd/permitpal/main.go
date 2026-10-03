@@ -23,9 +23,6 @@ func main() {
 		logger.Error("failed to load config", "error", err)
 		os.Exit(1)
 	}
-	if cfg.AppEnv == "development" && cfg.PasswordHash == "" && cfg.Password != "" {
-		logger.Warn("using development plaintext password; do not expose this environment", "app_env", cfg.AppEnv)
-	}
 
 	store, closeStore, err := repository.NewStore(context.Background(), cfg)
 	if err != nil {

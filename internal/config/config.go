@@ -22,18 +22,15 @@ const (
 )
 
 type Config struct {
-	Users           map[string]string
-	AppEnv          string
-	DataStore       string
-	LogLevel        string
-	Port            string
-	DatabaseURL     string
-	Password        string
-	PasswordHash    string
-	SessionSecret   string
-	SecureCookies   bool
-	SessionCookie   string
-	DefaultUsername string
+	Users         map[string]string
+	AppEnv        string
+	DataStore     string
+	LogLevel      string
+	Port          string
+	DatabaseURL   string
+	SessionSecret string
+	SecureCookies bool
+	SessionCookie string
 	// TrustedProxies lists peers whose X-Forwarded-For header is honored.
 	TrustedProxies []netip.Prefix
 	// Location decides the calendar date for "today" and submitted dates.
@@ -52,20 +49,11 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.Password, err = getEnvOrFile("PERMITPAL_PASSWORD", "")
-	if err != nil {
-		return nil, err
-	}
-	cfg.PasswordHash, err = getEnvOrFile("PERMITPAL_PASSWORD_HASH", "/run/secrets/permitpal_password_hash")
-	if err != nil {
-		return nil, err
-	}
 	cfg.SessionSecret, err = getEnvOrFile("SESSION_SECRET", "/run/secrets/permitpal_session_secret")
 	if err != nil {
 		return nil, err
 	}
 	cfg.SessionCookie = getEnv("SESSION_COOKIE", "permitpal_session")
-	cfg.DefaultUsername = getEnv("PERMITPAL_USERNAME", "driver")
 	users, err := getEnvOrFile("PERMITPAL_USERS", "/run/secrets/permitpal_users")
 	if err != nil {
 		return nil, err
@@ -73,20 +61,6 @@ func Load() (*Config, error) {
 	cfg.Users, err = parseUsers(users)
 	if err != nil {
 		return nil, err
-	}
-	if cfg.PasswordHash != "" || cfg.Password != "" {
-		if !validUsername.MatchString(cfg.DefaultUsername) {
-			return nil, errors.New("PERMITPAL_USERNAME has an invalid username")
-		}
-		if _, exists := cfg.Users[cfg.DefaultUsername]; exists {
-			return nil, errors.New("duplicate username in legacy credential and PERMITPAL_USERS")
-		}
-		if cfg.PasswordHash != "" {
-			if !validBcrypt(cfg.PasswordHash) {
-				return nil, errors.New("PERMITPAL_PASSWORD_HASH must be a bcrypt hash")
-			}
-			cfg.Users[cfg.DefaultUsername] = cfg.PasswordHash
-		}
 	}
 	cfg.SecureCookies, err = parseBoolEnv("SECURE_COOKIES", defaultSecureCookies(cfg.AppEnv))
 	if err != nil {
@@ -110,20 +84,12 @@ func Load() (*Config, error) {
 		return nil, errors.New("DATABASE_URL is required when DATA_STORE=postgres")
 	}
 
-	if cfg.AppEnv == "production" {
-		if cfg.Password != "" {
-			return nil, errors.New("PERMITPAL_PASSWORD is not allowed in production")
-		}
-		if len(cfg.Users) == 0 {
-			return nil, errors.New("PERMITPAL_USERS or PERMITPAL_PASSWORD_HASH is required in production")
-		}
-		if cfg.SessionSecret == "" {
-			return nil, errors.New("SESSION_SECRET is required in production")
-		}
+	if cfg.AppEnv == "production" && cfg.SessionSecret == "" {
+		return nil, errors.New("SESSION_SECRET is required in production")
 	}
 
-	if cfg.Password == "" && len(cfg.Users) == 0 {
-		return nil, errors.New("PERMITPAL_USERS, PERMITPAL_PASSWORD_HASH or PERMITPAL_PASSWORD is required")
+	if len(cfg.Users) == 0 {
+		return nil, errors.New("PERMITPAL_USERS is required")
 	}
 	if cfg.SessionSecret == "" {
 		return nil, errors.New("SESSION_SECRET is required")

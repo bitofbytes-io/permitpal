@@ -3,7 +3,6 @@ package auth
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -29,9 +28,6 @@ func NewManager(cfg *config.Config) *Manager {
 			dummyHashes[cost] = nil
 		}
 	}
-	if cost, err := bcrypt.Cost([]byte(cfg.PasswordHash)); err == nil {
-		dummyHashes[cost] = nil
-	}
 	if len(dummyHashes) == 0 {
 		dummyHashes[bcrypt.DefaultCost] = nil
 	}
@@ -51,7 +47,7 @@ func NewManager(cfg *config.Config) *Manager {
 func NormalizeUsername(username string) string { return strings.ToLower(strings.TrimSpace(username)) }
 func (m *Manager) hasUser(username string) bool {
 	_, ok := m.cfg.Users[username]
-	return ok || (username == m.cfg.DefaultUsername && (m.cfg.PasswordHash != "" || m.cfg.Password != ""))
+	return ok
 }
 func (m *Manager) CheckCredentials(username, password string) bool {
 	return m.checkCredentials(username, password, bcrypt.CompareHashAndPassword)
@@ -61,12 +57,6 @@ func (m *Manager) checkCredentials(username, password string, compare func([]byt
 	username = NormalizeUsername(username)
 	hash := m.cfg.Users[username]
 	matched := false
-	if hash == "" && username == m.cfg.DefaultUsername {
-		hash = m.cfg.PasswordHash
-		if hash == "" && m.cfg.Password != "" {
-			matched = subtle.ConstantTimeCompare([]byte(password), []byte(m.cfg.Password)) == 1
-		}
-	}
 	realCost, err := bcrypt.Cost([]byte(hash))
 	hasHash := hash != "" && err == nil
 	// Compare once at every configured cost, even after a match. Mixed-cost
@@ -153,12 +143,6 @@ func (m *Manager) sign(payload string) string {
 	_, _ = mac.Write([]byte(payload))
 	username, _, _ := strings.Cut(payload, ":")
 	credential := m.cfg.Users[username]
-	if credential == "" && username == m.cfg.DefaultUsername {
-		credential = m.cfg.PasswordHash
-		if credential == "" {
-			credential = m.cfg.Password
-		}
-	}
 	// Keep the public payload unchanged while revoking cookies after a credential
 	// replacement, including removing and later recreating the same username.
 	_, _ = mac.Write([]byte{0})

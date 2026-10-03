@@ -10,10 +10,15 @@ import (
 	"github.com/drywaters/permitpal/internal/auth"
 	"github.com/drywaters/permitpal/internal/config"
 	"github.com/drywaters/permitpal/internal/repository"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestRequireAuthLoadsDriverAndRejectsMissingDriver(t *testing.T) {
-	manager := auth.NewManager(&config.Config{DefaultUsername: "aiden", Password: "local-password", SessionCookie: "session", SessionSecret: "long-enough-test-secret-32-characters"})
+	hash, err := bcrypt.GenerateFromPassword([]byte("local-password"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := auth.NewManager(&config.Config{Users: map[string]string{"aiden": string(hash)}, SessionCookie: "session", SessionSecret: "long-enough-test-secret-32-characters"})
 	store := repository.NewMemoryStore(time.Now())
 	session := httptest.NewRecorder()
 	manager.SetSession(session, "aiden")

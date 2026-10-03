@@ -57,12 +57,6 @@ func TestManagerCredentialsAndSession(t *testing.T) {
 		t.Fatal("removed user accepted")
 	}
 }
-func TestLegacyDevelopmentCredential(t *testing.T) {
-	m := NewManager(&config.Config{DefaultUsername: "driver", Password: "local-password"})
-	if !m.CheckCredentials(" DRIVER ", "local-password") || m.CheckCredentials("caleb", "local-password") {
-		t.Fatal("legacy username not respected")
-	}
-}
 
 func TestMixedCostCredentialsUseSameWorkload(t *testing.T) {
 	low, err := bcrypt.GenerateFromPassword([]byte("low-password"), bcrypt.MinCost)
@@ -73,7 +67,7 @@ func TestMixedCostCredentialsUseSameWorkload(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := &config.Config{Users: map[string]string{"aiden": string(low), "same-cost": string(low)}, DefaultUsername: "caleb", PasswordHash: string(high)}
+	cfg := &config.Config{Users: map[string]string{"aiden": string(low), "same-cost": string(low), "caleb": string(high)}}
 	manager := NewManager(cfg)
 	for _, test := range []struct {
 		username, password string
@@ -128,46 +122,27 @@ func TestCredentialReplacementRevokesExistingSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"users", "legacy-hash", "legacy-plaintext"} {
-		t.Run(kind, func(t *testing.T) {
-			cfg := &config.Config{DefaultUsername: "aiden", SessionCookie: "session", SessionSecret: "a-session-secret-that-is-at-least-32-characters"}
-			replace := func(next bool) {
-				hash, password := string(firstHash), "first-password"
-				if next {
-					hash, password = string(nextHash), "next-password"
-				}
-				switch kind {
-				case "users":
-					cfg.Users = map[string]string{"aiden": hash}
-				case "legacy-hash":
-					cfg.PasswordHash = hash
-				case "legacy-plaintext":
-					cfg.Password = password
-				}
-			}
-			replace(false)
-			manager := NewManager(cfg)
-			requestWithCookie := func(username string) *http.Request {
-				rec := httptest.NewRecorder()
-				manager.SetSession(rec, username)
-				req := httptest.NewRequest("GET", "/", nil)
-				req.AddCookie(rec.Result().Cookies()[0])
-				return req
-			}
-			oldRequest := requestWithCookie("aiden")
-			if _, ok := manager.SessionUsername(oldRequest); !ok {
-				t.Fatal("initial cookie rejected")
-			}
-			replace(true)
-			if _, ok := manager.SessionUsername(oldRequest); ok {
-				t.Fatal("old cookie accepted after credential replacement")
-			}
-			if _, ok := manager.SessionUsername(requestWithCookie("aiden")); !ok {
-				t.Fatal("new cookie rejected")
-			}
-			if _, ok := manager.SessionUsername(requestWithCookie("unknown")); ok {
-				t.Fatal("unknown user cookie accepted")
-			}
-		})
+	cfg := &config.Config{Users: map[string]string{"aiden": string(firstHash)}, SessionCookie: "session", SessionSecret: "a-session-secret-that-is-at-least-32-characters"}
+	manager := NewManager(cfg)
+	requestWithCookie := func(username string) *http.Request {
+		rec := httptest.NewRecorder()
+		manager.SetSession(rec, username)
+		req := httptest.NewRequest("GET", "/", nil)
+		req.AddCookie(rec.Result().Cookies()[0])
+		return req
+	}
+	oldRequest := requestWithCookie("aiden")
+	if _, ok := manager.SessionUsername(oldRequest); !ok {
+		t.Fatal("initial cookie rejected")
+	}
+	cfg.Users = map[string]string{"aiden": string(nextHash)}
+	if _, ok := manager.SessionUsername(oldRequest); ok {
+		t.Fatal("old cookie accepted after credential replacement")
+	}
+	if _, ok := manager.SessionUsername(requestWithCookie("aiden")); !ok {
+		t.Fatal("new cookie rejected")
+	}
+	if _, ok := manager.SessionUsername(requestWithCookie("unknown")); ok {
+		t.Fatal("unknown user cookie accepted")
 	}
 }
