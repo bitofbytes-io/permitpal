@@ -1,10 +1,12 @@
 -- +goose Up
 -- Migration 001 seeds Caleb's original tracker into every new database, and
 -- 003 assigns it to the caleb driver. Released migrations cannot change, so
--- remove that seed here wherever it was never the real tracker: the same
--- goose run applied 001 and 003 (a new install; the original install applied
--- 003 months after 001), and no seeded row has been saved since 001 wrote
--- them all in one transaction. Without goose_db_version nothing is removed.
+-- remove that seed here, but only while creating a database: goose applied
+-- 001 within the last minute, in this same run, so nobody can have signed in
+-- to the seeded tracker yet. As a second check, no seeded row may have been
+-- saved since 001 wrote them all in one transaction. Databases migrated
+-- earlier, including the original install, keep their data, as does SQL
+-- applied without goose_db_version.
 -- +goose StatementBegin
 do $$
 declare
@@ -14,9 +16,9 @@ begin
     return;
   end if;
   if not coalesce((
-    select max(tstamp) filter (where version_id = 3) - min(tstamp) filter (where version_id = 1) < interval '1 minute'
+    select min(tstamp) > localtimestamp - interval '1 minute'
     from goose_db_version
-    where is_applied
+    where version_id = 1 and is_applied
   ), false) then
     return;
   end if;

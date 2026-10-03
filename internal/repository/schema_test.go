@@ -193,16 +193,17 @@ func TestNightHoursConstraintMigration(t *testing.T) {
 
 func TestUnusedSeedIsRemovedFromNewInstalls(t *testing.T) {
 	ctx := context.Background()
-	// install applies migrations 001-005 and records them as goose does,
-	// with 001 applied firstApplied before the others.
-	install := func(t *testing.T, firstApplied time.Duration) *pgxpool.Pool {
+	// install applies migrations 001-005 and records them as goose does:
+	// 000-002 applied created ago and 003-005 applied migrated ago.
+	install := func(t *testing.T, created, migrated time.Duration) *pgxpool.Pool {
 		t.Helper()
 		pool := testSchemaPool(t)
 		migrate(t, pool, 1, 5)
 		if _, err := pool.Exec(ctx, `create table goose_db_version (id serial primary key, version_id bigint not null, is_applied boolean not null, tstamp timestamp default now())`); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := pool.Exec(ctx, `insert into goose_db_version (version_id, is_applied, tstamp) values (0, true, now() - $1::interval), (1, true, now() - $1::interval), (2, true, now()), (3, true, now()), (4, true, now()), (5, true, now())`, fmt.Sprintf("%d seconds", int(firstApplied.Seconds()))); err != nil {
+		if _, err := pool.Exec(ctx, `insert into goose_db_version (version_id, is_applied, tstamp) select v, true, localtimestamp - case when v < 3 then $1::interval else $2::interval end from generate_series(0, 5) v`,
+			fmt.Sprintf("%d seconds", int(created.Seconds())), fmt.Sprintf("%d seconds", int(migrated.Seconds()))); err != nil {
 			t.Fatal(err)
 		}
 		return pool
@@ -219,7 +220,7 @@ func TestUnusedSeedIsRemovedFromNewInstalls(t *testing.T) {
 	}
 
 	t.Run("new install", func(t *testing.T) {
-		pool := install(t, 0)
+		pool := install(t, 0, 0)
 		migrate(t, pool, 6, 6)
 		if _, err := calebTracker(t, pool); err != ErrNotFound {
 			t.Fatalf("seeded caleb driver still present: %v", err)
@@ -237,15 +238,24 @@ func TestUnusedSeedIsRemovedFromNewInstalls(t *testing.T) {
 	})
 
 	t.Run("original install", func(t *testing.T) {
-		pool := install(t, 150*24*time.Hour)
+		pool := install(t, 150*24*time.Hour, 7*24*time.Hour)
 		migrate(t, pool, 6, 6)
 		if skills, err := calebTracker(t, pool); err != nil || skills != 13 {
 			t.Fatalf("original tracker has %d skills (%v), want 13", skills, err)
 		}
 	})
 
+	t.Run("install created by an earlier goose run", func(t *testing.T) {
+		// Someone may have signed in to the seeded tracker since, without saving.
+		pool := install(t, 2*time.Hour, 2*time.Hour)
+		migrate(t, pool, 6, 6)
+		if skills, err := calebTracker(t, pool); err != nil || skills != 13 {
+			t.Fatalf("tracker has %d skills (%v), want 13", skills, err)
+		}
+	})
+
 	t.Run("new install whose seed was used", func(t *testing.T) {
-		pool := install(t, 0)
+		pool := install(t, 0, 0)
 		store := NewPostgresStore(pool)
 		caleb, err := store.DriverByUsername(ctx, "caleb")
 		if err != nil {
