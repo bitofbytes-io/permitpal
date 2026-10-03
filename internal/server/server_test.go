@@ -396,3 +396,51 @@ func TestStaticFilesServeWithoutDirectoryListings(t *testing.T) {
 		}
 	}
 }
+
+func TestRouterRejectsCrossOriginPosts(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+	client := ts.Client()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Jar = jar
+	closeBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"caleb"}, "password": {"test-password"}}))
+
+	forms := map[string]url.Values{
+		"/login":                    {"username": {"aiden"}, "password": {"test-password"}},
+		"/logout":                   {},
+		"/profile":                  {"total_hours": {"1"}, "night_hours": {"1"}},
+		"/requirements/use-of-lane": {"rating": {"bad"}, "notes": {"cross-site"}},
+	}
+	for name, setOrigin := range map[string]func(*http.Request){
+		"foreign origin":       func(r *http.Request) { r.Header.Set("Origin", "https://attacker.example") },
+		"foreign referer":      func(r *http.Request) { r.Header.Set("Referer", "https://attacker.example/form") },
+		"no origin or referer": func(*http.Request) {},
+	} {
+		for path, form := range forms {
+			t.Run(name+path, func(t *testing.T) {
+				req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, ts.URL+path, strings.NewReader(form.Encode()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				setOrigin(req)
+				res, err := client.Do(req)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if body := readBody(t, res); res.StatusCode != http.StatusForbidden || !strings.Contains(body, "Invalid cross-site request") {
+					t.Fatalf("status=%d body=%q, want 403", res.StatusCode, body)
+				}
+			})
+		}
+	}
+
+	// None of the rejected posts logged Caleb out, switched accounts or changed his tracker.
+	body := readBody(t, doGet(t, client, ts.URL+"/"))
+	if !strings.Contains(body, "Welcome back, Caleb!") || !strings.Contains(body, "56.0 total hours") || strings.Contains(body, "cross-site") {
+		t.Fatalf("a cross-origin post changed state: %s", body)
+	}
+}
