@@ -12,7 +12,6 @@ import (
 	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/ui"
-	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 type AuthHandler struct {
@@ -94,11 +93,13 @@ func truncateRunes(value string, limit int) string {
 }
 
 // Logout ends the driver's session generation, which signs them out on every
-// device, then clears this browser's cookie.
+// device, then clears this browser's cookie. If the generation cannot be
+// ended, the cookie stays so the driver can retry.
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if session, ok := h.auth.Session(r); ok {
 		if err := h.store.EndSessions(r.Context(), session.Username, session.Generation); err != nil {
-			slog.Error("logout could not end sessions", "error", err, "request_id", chimw.GetReqID(r.Context()))
+			middleware.ServerError(w, r, "Unable to log out", err)
+			return
 		}
 	}
 	h.auth.ClearSession(w)
