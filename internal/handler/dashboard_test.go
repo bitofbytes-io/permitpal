@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,6 +16,7 @@ import (
 	"github.com/drywaters/permitpal/internal/model"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 func TestParseHoursAllowsSingleDecimalPlace(t *testing.T) {
@@ -160,12 +164,40 @@ func TestRatingDefaultsToLocalDateLateInTheEvening(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d; body = %q", rec.Code, rec.Body.String())
 	}
-	dashboard, err := store.GetDashboard(context.Background(), driver, now)
+	tracker, err := store.GetTracker(context.Background(), driver.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	requirement, _ := model.RequirementByKey(dashboard.Requirements, "quick-stop")
+	requirement, _ := model.RequirementByKey(tracker.Requirements, "quick-stop")
 	if got := model.DateValue(requirement.RatedOn); got != "2026-09-26" {
 		t.Fatalf("rated on = %q, want the New York date 2026-09-26", got)
+	}
+}
+
+type failingTrackerStore struct{ repository.Store }
+
+func (failingTrackerStore) GetTracker(context.Context, int64) (model.Tracker, error) {
+	return model.Tracker{}, errors.New("database unavailable")
+}
+
+func TestServerErrorsLogTheCauseAndRequestID(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	handler := chimw.RequestID(http.HandlerFunc(NewDashboardHandler(failingTrackerStore{}, time.UTC).Dashboard))
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set(chimw.RequestIDHeader, "req-123")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req.WithContext(middleware.WithDriver(req.Context(), model.Driver{ID: 1})))
+
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "database unavailable") {
+		t.Fatalf("status=%d body=%q; want a 500 that hides the cause", rec.Code, rec.Body.String())
+	}
+	for _, want := range []string{"level=ERROR", `error="database unavailable"`, "request_id=req-123", "path=/"} {
+		if !strings.Contains(logs.String(), want) {
+			t.Fatalf("log %q is missing %s", logs.String(), want)
+		}
 	}
 }

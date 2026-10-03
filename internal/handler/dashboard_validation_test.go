@@ -44,13 +44,13 @@ func TestDashboardValidation(t *testing.T) {
 				router.ServeHTTP(rec, req.WithContext(middleware.WithDriver(req.Context(), driver)))
 				return rec
 			}
-			load := func() model.Dashboard {
+			load := func() model.Tracker {
 				t.Helper()
-				dashboard, err := store.GetDashboard(context.Background(), driver, now)
+				tracker, err := store.GetTracker(context.Background(), driver.ID)
 				if err != nil {
 					t.Fatal(err)
 				}
-				return dashboard
+				return tracker
 			}
 			for _, date := range []string{"not-a-date", "2026-02-30", "2026-13-01", "2026-01-15T12:00:00Z"} {
 				t.Run("invalid-profile-date/"+date, func(t *testing.T) {
@@ -76,6 +76,51 @@ func TestDashboardValidation(t *testing.T) {
 					})
 				}
 			}
+			// "now" is 2026-05-01 in the app time zone.
+			for name, test := range map[string]struct {
+				path string
+				form url.Values
+				want string
+			}{
+				"night-over-total":     {"/profile", url.Values{"total_hours": {"4"}, "night_hours": {"4.5"}}, "Night hours cannot be more than total hours"},
+				"future-permit-date":   {"/profile", url.Values{"total_hours": {"4"}, "night_hours": {"1"}, "permit_issue_date": {"2026-05-02"}}, "Permit issue date cannot be in the future"},
+				"future-rated-on-date": {"/requirements/quick-stop", url.Values{"rating": {"good"}, "rated_on": {"2026-05-02"}}, "Last rated date cannot be in the future"},
+			} {
+				t.Run(name, func(t *testing.T) {
+					before := load()
+					rec := submit(test.path, test.form)
+					if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), test.want) {
+						t.Fatalf("status=%d body=%q, want 400 %q", rec.Code, rec.Body.String(), test.want)
+					}
+					if !reflect.DeepEqual(before, load()) {
+						t.Fatal("rejected input changed the tracker")
+					}
+				})
+			}
+			t.Run("clearing-a-saved-future-date", func(t *testing.T) {
+				// A rating saved before future dates were rejected can still be cleared.
+				req, _ := model.RequirementByKey(load().Requirements, "turn-about")
+				future := now.AddDate(0, 0, 3)
+				req.Rating, req.RatedOn = model.RatingGood, &future
+				if _, err := store.UpdateRequirement(context.Background(), driver.ID, req); err != nil {
+					t.Fatal(err)
+				}
+				rec := submit("/requirements/turn-about", url.Values{"rating": {"good"}, "rated_on": {future.Format("2006-01-02")}, "clear_rating": {"true"}})
+				if rec.Code != http.StatusOK {
+					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+				}
+				if cleared, _ := model.RequirementByKey(load().Requirements, "turn-about"); cleared.Rating != model.RatingNotRated || cleared.RatedOn != nil {
+					t.Fatalf("requirement not cleared: %+v", cleared)
+				}
+			})
+			t.Run("today-and-equal-hours-are-allowed", func(t *testing.T) {
+				if rec := submit("/profile", url.Values{"total_hours": {"4"}, "night_hours": {"4"}, "permit_issue_date": {"2026-05-01"}}); rec.Code != http.StatusOK {
+					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+				}
+				if rec := submit("/requirements/quick-stop", url.Values{"rating": {"good"}, "rated_on": {"2026-05-01"}}); rec.Code != http.StatusOK {
+					t.Fatalf("status=%d body=%q", rec.Code, rec.Body.String())
+				}
+			})
 			for _, field := range []string{"total_hours", "night_hours"} {
 				for _, value := range []string{"NaN", "Inf", "+Inf", "-Inf", "Infinity", "1.23", "-1", "61"} {
 					t.Run(field+"/"+value, func(t *testing.T) {
@@ -169,28 +214,27 @@ func validationStore(t *testing.T, backend string, now time.Time) repository.Sto
 		if err != nil {
 			t.Fatal(err)
 		}
-		up, _, found := strings.Cut(string(migration), "-- +goose Down")
+		up, down, found := strings.Cut(string(migration), "-- +goose Down")
 		if !found {
 			t.Fatalf("migration %s has no down boundary", path)
 		}
 		if _, err := pool.Exec(ctx, up); err != nil {
 			t.Fatalf("apply %s: %v", path, err)
 		}
-	}
-	// Exercise the exact rollback SQL in the same non-public schema, then restore it.
-	migration, err := os.ReadFile("../../migrations/003_multi_driver_ratings.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	up, down, _ := strings.Cut(string(migration), "-- +goose Down")
-	beforeRows := migrationSnapshot(t, pool)
-	for _, sql := range []string{down, up} {
-		if _, err := pool.Exec(ctx, sql); err != nil {
-			t.Fatalf("migration 003 down/up: %v", err)
+		if filepath.Base(path) != "003_multi_driver_ratings.sql" {
+			continue
 		}
-	}
-	if afterRows := migrationSnapshot(t, pool); !reflect.DeepEqual(beforeRows, afterRows) {
-		t.Fatal("migration 003 down/up changed Caleb history")
+		// Exercise the exact rollback SQL in the same non-public schema, then
+		// restore it, before later migrations build on 003's tables.
+		beforeRows := migrationSnapshot(t, pool)
+		for _, sql := range []string{down, up} {
+			if _, err := pool.Exec(ctx, sql); err != nil {
+				t.Fatalf("migration 003 down/up: %v", err)
+			}
+		}
+		if afterRows := migrationSnapshot(t, pool); !reflect.DeepEqual(beforeRows, afterRows) {
+			t.Fatal("migration 003 down/up changed Caleb history")
+		}
 	}
 	return repository.NewPostgresStore(pool)
 }
@@ -216,7 +260,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			before, err := store.GetDashboard(ctx, caleb, now)
+			before, err := store.GetTracker(ctx, caleb.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -246,7 +290,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 				if !strings.Contains(rec.Body.String(), `id="practice-focus"`) || !strings.Contains(rec.Body.String(), `hx-swap-oob="outerHTML"`) {
 					t.Fatal("response did not update practice focus out of band")
 				}
-				dash, err := store.GetDashboard(ctx, aiden, now)
+				dash, err := store.GetTracker(ctx, aiden.ID)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -262,7 +306,7 @@ func TestDriverIsolationAndRatings(t *testing.T) {
 			if rec := submit("/profile", url.Values{"total_hours": {"20"}, "night_hours": {"3"}}); rec.Code != 200 {
 				t.Fatal(rec.Body.String())
 			}
-			after, err := store.GetDashboard(ctx, caleb, now)
+			after, err := store.GetTracker(ctx, caleb.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -315,7 +359,7 @@ func TestConcurrentEnsureDriver(t *testing.T) {
 					t.Fatal("concurrent login created different drivers")
 				}
 			}
-			dash, err := store.GetDashboard(ctx, first, now)
+			dash, err := store.GetTracker(ctx, first.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -356,7 +400,7 @@ func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 			if rec.Code != 200 {
 				t.Fatal(rec.Body.String())
 			}
-			dash, err := store.GetDashboard(ctx, driver, now)
+			dash, err := store.GetTracker(ctx, driver.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -364,11 +408,47 @@ func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 			if req.Rating != model.RatingNotRated || req.RatedOn != nil || req.Notes != "Keep this practice note" {
 				t.Fatalf("cleared requirement=%+v", req)
 			}
-			if len(dash.PracticeFocus) == 0 || dash.PracticeFocus[0].Key != "quick-stop" {
+			if focus := model.NewDashboard(driver, dash.Profile, dash.Requirements, now).PracticeFocus; len(focus) == 0 || focus[0].Key != "quick-stop" {
 				t.Fatal("clear did not restore practice focus")
 			}
 			if strings.Contains(rec.Body.String(), `checked`) || !strings.Contains(rec.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(rec.Body.String(), "Clear rating for Quick stop") {
 				t.Fatal("clear response did not reset selection and refresh focus")
+			}
+		})
+	}
+}
+
+func TestEndSessionsAdvancesTheGenerationOnce(t *testing.T) {
+	for _, backend := range []string{"memory", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now()
+			store := validationStore(t, backend, now)
+			created, err := store.EnsureDriver(ctx, "aiden", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if created.SessionGeneration != 0 {
+				t.Fatalf("new driver generation = %d", created.SessionGeneration)
+			}
+			for _, generation := range []int64{0, 0, 5} {
+				if err := store.EndSessions(ctx, "aiden", generation); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.EndSessions(ctx, "missing", 0); err != nil {
+				t.Fatal(err)
+			}
+			byName, err := store.DriverByUsername(ctx, "aiden")
+			if err != nil {
+				t.Fatal(err)
+			}
+			again, err := store.EnsureDriver(ctx, "aiden", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if byName.SessionGeneration != 1 || again.SessionGeneration != 1 {
+				t.Fatalf("generation = %d / %d, want 1 after one matching logout", byName.SessionGeneration, again.SessionGeneration)
 			}
 		})
 	}

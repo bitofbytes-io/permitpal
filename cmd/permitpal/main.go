@@ -31,12 +31,7 @@ func main() {
 	}
 	defer closeStore()
 
-	app := server.New(cfg, store, logger)
-	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           app.Router(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	srv := server.New(cfg, store, logger).HTTPServer()
 
 	serverErr := make(chan error, 1)
 	go func() {

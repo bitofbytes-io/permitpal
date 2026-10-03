@@ -21,12 +21,12 @@ func TestMemoryDriversAreIsolatedAndIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, _ := store.GetDashboard(ctx, caleb, now)
+	before, _ := store.GetTracker(ctx, caleb.ID)
 	again, _ := store.EnsureDriver(ctx, "aiden", now)
 	if again != aiden {
 		t.Fatal("EnsureDriver changed driver")
 	}
-	dash, _ := store.GetDashboard(ctx, aiden, now)
+	dash, _ := store.GetTracker(ctx, aiden.ID)
 	if len(dash.Requirements) != 17 || dash.Profile.TotalHours != 0 || dash.Profile.PermitIssueDate != nil {
 		t.Fatalf("new dashboard: %+v", dash)
 	}
@@ -47,22 +47,22 @@ func TestMemoryDriversAreIsolatedAndIdempotent(t *testing.T) {
 	*saved.PermitIssueDate = time.Time{}
 	*savedReq.RatedOn = time.Time{}
 	date = time.Time{}
-	dash, _ = store.GetDashboard(ctx, aiden, now)
+	dash, _ = store.GetTracker(ctx, aiden.ID)
 	if dash.Profile.PermitIssueDate.IsZero() || dash.Requirements[0].RatedOn.IsZero() {
 		t.Fatal("write results or arguments share date pointers")
 	}
 	*dash.Profile.PermitIssueDate = time.Time{}
 	*dash.Requirements[0].RatedOn = time.Time{}
-	next, _ := store.GetDashboard(ctx, aiden, now)
+	next, _ := store.GetTracker(ctx, aiden.ID)
 	if next.Profile.PermitIssueDate.IsZero() || next.Requirements[0].RatedOn.IsZero() {
 		t.Fatal("dashboard shares date pointers")
 	}
-	after, _ := store.GetDashboard(ctx, caleb, now)
+	after, _ := store.GetTracker(ctx, caleb.ID)
 	if !reflect.DeepEqual(before, after) {
 		t.Fatal("Aiden changed Caleb data")
 	}
 	again, _ = store.EnsureDriver(ctx, "aiden", now)
-	next, _ = store.GetDashboard(ctx, again, now)
+	next, _ = store.GetTracker(ctx, again.ID)
 	if next.Profile.TotalHours != 12 || next.Requirements[0].Notes != "Practice" {
 		t.Fatal("login reset saved data")
 	}

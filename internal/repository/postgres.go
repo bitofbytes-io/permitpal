@@ -18,16 +18,16 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{db: db}
 }
 
-func (s *PostgresStore) GetDashboard(ctx context.Context, driver model.Driver, now time.Time) (model.Dashboard, error) {
-	profile, err := s.getProfile(ctx, driver.ID, now)
+func (s *PostgresStore) GetTracker(ctx context.Context, driverID int64) (model.Tracker, error) {
+	profile, err := s.getProfile(ctx, driverID)
 	if err != nil {
-		return model.Dashboard{}, err
+		return model.Tracker{}, err
 	}
-	requirements, err := s.getRequirements(ctx, driver.ID)
+	requirements, err := s.getRequirements(ctx, driverID)
 	if err != nil {
-		return model.Dashboard{}, err
+		return model.Tracker{}, err
 	}
-	return model.NewDashboard(driver, profile, requirements, now), nil
+	return model.Tracker{Profile: profile, Requirements: requirements}, nil
 }
 
 func (s *PostgresStore) UpdateProfile(ctx context.Context, driverID int64, profile model.Profile) (model.Profile, error) {
@@ -59,18 +59,14 @@ func (s *PostgresStore) UpdateRequirement(ctx context.Context, driverID int64, r
 	return req, err
 }
 
-func (s *PostgresStore) getProfile(ctx context.Context, driverID int64, now time.Time) (model.Profile, error) {
+// getProfile reads the profile row that EnsureDriver creates at every login.
+func (s *PostgresStore) getProfile(ctx context.Context, driverID int64) (model.Profile, error) {
 	const query = `select permit_issue_date, total_hours, night_hours, updated_at from app_profile where driver_id = $1`
 	var profile model.Profile
 	err := s.db.QueryRow(ctx, query, driverID).
 		Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// A concurrent login or update may create the row after our initial read.
-		// Do not overwrite its progress while repairing a missing profile.
-		if _, err = s.db.Exec(ctx, `insert into app_profile (driver_id, updated_at) values ($1,$2) on conflict (driver_id) do nothing`, driverID, now); err != nil {
-			return model.Profile{}, err
-		}
-		err = s.db.QueryRow(ctx, query, driverID).Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
+		return model.Profile{}, ErrNotFound
 	}
 	return profile, err
 }
@@ -98,11 +94,15 @@ func (s *PostgresStore) getRequirements(ctx context.Context, driverID int64) ([]
 
 func (s *PostgresStore) DriverByUsername(ctx context.Context, username string) (model.Driver, error) {
 	var driver model.Driver
-	err := s.db.QueryRow(ctx, `select id,username,display_name from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName)
+	err := s.db.QueryRow(ctx, `select id,username,display_name,session_generation from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName, &driver.SessionGeneration)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Driver{}, ErrNotFound
 	}
 	return driver, err
+}
+func (s *PostgresStore) EndSessions(ctx context.Context, username string, generation int64) error {
+	_, err := s.db.Exec(ctx, `update drivers set session_generation = session_generation + 1 where username = $1 and session_generation = $2`, username, generation)
+	return err
 }
 func (s *PostgresStore) EnsureDriver(ctx context.Context, username string, now time.Time) (model.Driver, error) {
 	tx, err := s.db.Begin(ctx)
@@ -116,7 +116,7 @@ func (s *PostgresStore) EnsureDriver(ctx context.Context, username string, now t
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return model.Driver{}, err
 	}
-	err = tx.QueryRow(ctx, `select id,username,display_name from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName)
+	err = tx.QueryRow(ctx, `select id,username,display_name,session_generation from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName, &driver.SessionGeneration)
 	if err != nil {
 		return model.Driver{}, err
 	}
