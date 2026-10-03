@@ -128,12 +128,15 @@ func TestLoadRejectsMultibyteSessionSecretWithTooFewCharacters(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsMissingSecretsOutsideDevelopment(t *testing.T) {
-	clearAuthEnv(t)
-	t.Setenv("APP_ENV", "staging")
-
-	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "PERMITPAL_USERS is required") {
-		t.Fatalf("Load error = %v, want missing password secret error", err)
+func TestLoadRejectsUnknownAppEnv(t *testing.T) {
+	t.Setenv("PERMITPAL_USERS", "driver:"+testHash)
+	t.Setenv("SESSION_SECRET", strings.Repeat("s", 32))
+	t.Setenv("DATA_STORE", "memory")
+	for _, appEnv := range []string{"staging", "prod", "producton", "dev"} {
+		t.Setenv("APP_ENV", appEnv)
+		if _, err := Load(); err == nil || !strings.Contains(err.Error(), "APP_ENV must be development or production") {
+			t.Fatalf("APP_ENV=%q: Load error = %v, want unknown APP_ENV error", appEnv, err)
+		}
 	}
 }
 

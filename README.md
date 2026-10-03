@@ -46,7 +46,7 @@ Accounts come only from `PERMITPAL_USERS` or the users file. An explicitly empty
 
 | Setting | Required | Purpose |
 | --- | --- | --- |
-| `APP_ENV` | No | Docker defaults to `production`; local runs default to `development` |
+| `APP_ENV` | No | `development` or `production`; any other value stops startup. Docker defaults to `production`; local runs default to `development` |
 | `DATA_STORE` | No | Docker defaults to `postgres`; development defaults to `memory` |
 | `DATABASE_URL` | With Postgres | PostgreSQL connection string |
 | `PERMITPAL_USERS` / `PERMITPAL_USERS_FILE` | Yes | Newline-separated `username:bcrypthash` entries; the optional default file is `/run/secrets/permitpal_users` |
