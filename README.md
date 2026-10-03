@@ -12,7 +12,6 @@ PermitPal is a self-hosted Go dashboard for tracking progress toward the North C
 ## Build the image
 
 ```bash
-make tail-prod
 docker build -t permitpal:local .
 ```
 
