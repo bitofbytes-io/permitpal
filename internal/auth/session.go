@@ -77,9 +77,21 @@ func (m *Manager) checkCredentials(username, password string, compare func([]byt
 	return matched
 }
 
-func (m *Manager) SetSession(w http.ResponseWriter, username string) {
+// Session is the signed identity in a session cookie.
+type Session struct {
+	Username string
+	// Generation must equal the driver's current session generation.
+	Generation int64
+}
+
+func (m *Manager) SetSession(w http.ResponseWriter, username string, generation int64) {
 	expires := time.Now().Add(30 * 24 * time.Hour)
 	payload := fmt.Sprintf("%s:%d", NormalizeUsername(username), expires.Unix())
+	// Generation 0 keeps the cookie format from before generations existed,
+	// so the previous release still accepts it during a rolling deploy.
+	if generation != 0 {
+		payload += ":" + strconv.FormatInt(generation, 10)
+	}
 	signature := m.sign(payload)
 	value := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + signature
 
@@ -106,38 +118,48 @@ func (m *Manager) ClearSession(w http.ResponseWriter) {
 	})
 }
 
-func (m *Manager) SessionUsername(r *http.Request) (string, bool) {
+// Session returns the cookie's signed identity. It does not check the
+// generation against the driver; middleware.SessionDriver does.
+func (m *Manager) Session(r *http.Request) (Session, bool) {
 	cookie, err := r.Cookie(m.cfg.SessionCookie)
 	if err != nil || cookie.Value == "" {
-		return "", false
+		return Session{}, false
 	}
 
 	parts := strings.Split(cookie.Value, ".")
 	if len(parts) != 2 {
-		return "", false
+		return Session{}, false
 	}
 
 	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return "", false
+		return Session{}, false
 	}
 	payload := string(payloadBytes)
 	if !hmac.Equal([]byte(parts[1]), []byte(m.sign(payload))) {
-		return "", false
+		return Session{}, false
 	}
 
+	// username:expires, then :generation unless the generation is 0.
 	payloadParts := strings.Split(payload, ":")
-	if len(payloadParts) != 2 {
-		return "", false
+	if len(payloadParts) != 2 && len(payloadParts) != 3 {
+		return Session{}, false
 	}
 	expiresUnix, err := strconv.ParseInt(payloadParts[1], 10, 64)
 	if err != nil {
-		return "", false
+		return Session{}, false
 	}
 	if _, ok := m.credential(payloadParts[0]); !ok || !time.Now().Before(time.Unix(expiresUnix, 0)) {
-		return "", false
+		return Session{}, false
 	}
-	return payloadParts[0], true
+	session := Session{Username: payloadParts[0]}
+	if len(payloadParts) == 3 {
+		session.Generation, err = strconv.ParseInt(payloadParts[2], 10, 64)
+		if err != nil || session.Generation < 0 {
+			return Session{}, false
+		}
+	}
+	return session, true
 }
 
 func (m *Manager) sign(payload string) string {

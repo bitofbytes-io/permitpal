@@ -94,11 +94,15 @@ func (s *PostgresStore) getRequirements(ctx context.Context, driverID int64) ([]
 
 func (s *PostgresStore) DriverByUsername(ctx context.Context, username string) (model.Driver, error) {
 	var driver model.Driver
-	err := s.db.QueryRow(ctx, `select id,username,display_name from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName)
+	err := s.db.QueryRow(ctx, `select id,username,display_name,session_generation from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName, &driver.SessionGeneration)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Driver{}, ErrNotFound
 	}
 	return driver, err
+}
+func (s *PostgresStore) EndSessions(ctx context.Context, username string, generation int64) error {
+	_, err := s.db.Exec(ctx, `update drivers set session_generation = session_generation + 1 where username = $1 and session_generation = $2`, username, generation)
+	return err
 }
 func (s *PostgresStore) EnsureDriver(ctx context.Context, username string, now time.Time) (model.Driver, error) {
 	tx, err := s.db.Begin(ctx)
@@ -112,7 +116,7 @@ func (s *PostgresStore) EnsureDriver(ctx context.Context, username string, now t
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return model.Driver{}, err
 	}
-	err = tx.QueryRow(ctx, `select id,username,display_name from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName)
+	err = tx.QueryRow(ctx, `select id,username,display_name,session_generation from drivers where username=$1`, username).Scan(&driver.ID, &driver.Username, &driver.DisplayName, &driver.SessionGeneration)
 	if err != nil {
 		return model.Driver{}, err
 	}

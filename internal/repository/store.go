@@ -13,6 +13,9 @@ import (
 type Store interface {
 	EnsureDriver(ctx context.Context, username string, now time.Time) (model.Driver, error)
 	DriverByUsername(ctx context.Context, username string) (model.Driver, error)
+	// EndSessions increments the driver's session generation if it still
+	// equals generation, so a stale cookie cannot end newer sessions.
+	EndSessions(ctx context.Context, username string, generation int64) error
 	GetTracker(ctx context.Context, driverID int64) (model.Tracker, error)
 	UpdateProfile(ctx context.Context, driverID int64, profile model.Profile) (model.Profile, error)
 	UpdateRequirement(ctx context.Context, driverID int64, req model.Requirement) (model.Requirement, error)

@@ -40,6 +40,14 @@ func (s *MemoryStore) DriverByUsername(_ context.Context, username string) (mode
 	}
 	return model.Driver{}, ErrNotFound
 }
+func (s *MemoryStore) EndSessions(_ context.Context, username string, generation int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if state, ok := s.drivers[username]; ok && state.driver.SessionGeneration == generation {
+		state.driver.SessionGeneration++
+	}
+	return nil
+}
 func (s *MemoryStore) stateByID(id int64) *driverState {
 	for _, state := range s.drivers {
 		if state.driver.ID == id {

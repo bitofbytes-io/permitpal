@@ -26,6 +26,9 @@ type Driver struct {
 	ID          int64
 	Username    string
 	DisplayName string
+	// SessionGeneration is the generation a session cookie must carry;
+	// logout increments it.
+	SessionGeneration int64
 }
 
 func NewDriver(username string) Driver {

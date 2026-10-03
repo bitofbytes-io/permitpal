@@ -169,28 +169,27 @@ func validationStore(t *testing.T, backend string, now time.Time) repository.Sto
 		if err != nil {
 			t.Fatal(err)
 		}
-		up, _, found := strings.Cut(string(migration), "-- +goose Down")
+		up, down, found := strings.Cut(string(migration), "-- +goose Down")
 		if !found {
 			t.Fatalf("migration %s has no down boundary", path)
 		}
 		if _, err := pool.Exec(ctx, up); err != nil {
 			t.Fatalf("apply %s: %v", path, err)
 		}
-	}
-	// Exercise the exact rollback SQL in the same non-public schema, then restore it.
-	migration, err := os.ReadFile("../../migrations/003_multi_driver_ratings.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	up, down, _ := strings.Cut(string(migration), "-- +goose Down")
-	beforeRows := migrationSnapshot(t, pool)
-	for _, sql := range []string{down, up} {
-		if _, err := pool.Exec(ctx, sql); err != nil {
-			t.Fatalf("migration 003 down/up: %v", err)
+		if filepath.Base(path) != "003_multi_driver_ratings.sql" {
+			continue
 		}
-	}
-	if afterRows := migrationSnapshot(t, pool); !reflect.DeepEqual(beforeRows, afterRows) {
-		t.Fatal("migration 003 down/up changed Caleb history")
+		// Exercise the exact rollback SQL in the same non-public schema, then
+		// restore it, before later migrations build on 003's tables.
+		beforeRows := migrationSnapshot(t, pool)
+		for _, sql := range []string{down, up} {
+			if _, err := pool.Exec(ctx, sql); err != nil {
+				t.Fatalf("migration 003 down/up: %v", err)
+			}
+		}
+		if afterRows := migrationSnapshot(t, pool); !reflect.DeepEqual(beforeRows, afterRows) {
+			t.Fatal("migration 003 down/up changed Caleb history")
+		}
 	}
 	return repository.NewPostgresStore(pool)
 }
@@ -369,6 +368,42 @@ func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 			}
 			if strings.Contains(rec.Body.String(), `checked`) || !strings.Contains(rec.Body.String(), `hx-swap-oob="outerHTML"`) || !strings.Contains(rec.Body.String(), "Clear rating for Quick stop") {
 				t.Fatal("clear response did not reset selection and refresh focus")
+			}
+		})
+	}
+}
+
+func TestEndSessionsAdvancesTheGenerationOnce(t *testing.T) {
+	for _, backend := range []string{"memory", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now()
+			store := validationStore(t, backend, now)
+			created, err := store.EnsureDriver(ctx, "aiden", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if created.SessionGeneration != 0 {
+				t.Fatalf("new driver generation = %d", created.SessionGeneration)
+			}
+			for _, generation := range []int64{0, 0, 5} {
+				if err := store.EndSessions(ctx, "aiden", generation); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := store.EndSessions(ctx, "missing", 0); err != nil {
+				t.Fatal(err)
+			}
+			byName, err := store.DriverByUsername(ctx, "aiden")
+			if err != nil {
+				t.Fatal(err)
+			}
+			again, err := store.EnsureDriver(ctx, "aiden", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if byName.SessionGeneration != 1 || again.SessionGeneration != 1 {
+				t.Fatalf("generation = %d / %d, want 1 after one matching logout", byName.SessionGeneration, again.SessionGeneration)
 			}
 		})
 	}

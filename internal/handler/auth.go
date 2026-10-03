@@ -12,6 +12,7 @@ import (
 	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/ui"
+	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
 type AuthHandler struct {
@@ -25,11 +26,9 @@ func NewAuthHandler(authManager *auth.Manager, store repository.Store, limiter *
 }
 
 func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
-	if username, ok := h.auth.SessionUsername(r); ok {
-		if _, err := h.store.DriverByUsername(r.Context(), username); err == nil {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
-		}
+	if _, ok, _ := middleware.SessionDriver(r, h.auth, h.store); ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
 	}
 	render(w, r, ui.LoginPage("", ""))
 }
@@ -71,11 +70,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.limiter.Succeed(limitIP, username)
-	if _, err := h.store.EnsureDriver(r.Context(), username, time.Now()); err != nil {
+	driver, err := h.store.EnsureDriver(r.Context(), username, time.Now())
+	if err != nil {
 		middleware.ServerError(w, r, "Unable to load driver", err)
 		return
 	}
-	h.auth.SetSession(w, username)
+	h.auth.SetSession(w, driver.Username, driver.SessionGeneration)
 	slog.Info("login successful", "username", username)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -93,7 +93,14 @@ func truncateRunes(value string, limit int) string {
 	return value
 }
 
+// Logout ends the driver's session generation, which signs them out on every
+// device, then clears this browser's cookie.
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	if session, ok := h.auth.Session(r); ok {
+		if err := h.store.EndSessions(r.Context(), session.Username, session.Generation); err != nil {
+			slog.Error("logout could not end sessions", "error", err, "request_id", chimw.GetReqID(r.Context()))
+		}
+	}
 	h.auth.ClearSession(w)
 	slog.Info("logout")
 	http.Redirect(w, r, "/login", http.StatusSeeOther)

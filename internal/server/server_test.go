@@ -444,3 +444,45 @@ func TestRouterRejectsCrossOriginPosts(t *testing.T) {
 		t.Fatalf("a cross-origin post changed state: %s", body)
 	}
 }
+
+func TestLogoutEndsSessionsOnEveryDevice(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+	signIn := func() *http.Client {
+		t.Helper()
+		jar, err := cookiejar.New(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client := &http.Client{Jar: jar}
+		closeBody(t, doPostForm(t, client, ts.URL+"/login", url.Values{"username": {"caleb"}, "password": {"test-password"}}))
+		return client
+	}
+	signedIn := func(client *http.Client) bool {
+		t.Helper()
+		return strings.Contains(readBody(t, doGet(t, client, ts.URL+"/")), "Welcome back, Caleb!")
+	}
+	phone, laptop := signIn(), signIn()
+	// Keep the laptop's cookie: the browser drops it once the server clears it.
+	laptopURL, _ := url.Parse(ts.URL)
+	laptopCookies := laptop.Jar.Cookies(laptopURL)
+	if !signedIn(phone) || !signedIn(laptop) {
+		t.Fatal("both devices should start signed in")
+	}
+	closeBody(t, doPostForm(t, phone, ts.URL+"/logout", nil))
+	if signedIn(phone) || signedIn(laptop) {
+		t.Fatal("logout left a device signed in")
+	}
+	again := signIn()
+	if !signedIn(again) {
+		t.Fatal("signing in after logout failed")
+	}
+	replay, _ := cookiejar.New(nil)
+	replay.SetCookies(laptopURL, laptopCookies)
+	if signedIn(&http.Client{Jar: replay}) {
+		t.Fatal("a cookie from before the logout still works")
+	}
+	if !signedIn(again) {
+		t.Fatal("the replayed old cookie ended the new session")
+	}
+}
