@@ -45,20 +45,22 @@ func NewManager(cfg *config.Config) *Manager {
 }
 
 func NormalizeUsername(username string) string { return strings.ToLower(strings.TrimSpace(username)) }
-func (m *Manager) hasUser(username string) bool {
-	_, ok := m.cfg.Users[username]
-	return ok
+
+// credential returns the configured bcrypt hash for a normalized username.
+func (m *Manager) credential(username string) (string, bool) {
+	hash, ok := m.cfg.Users[username]
+	return hash, ok
 }
+
 func (m *Manager) CheckCredentials(username, password string) bool {
 	return m.checkCredentials(username, password, bcrypt.CompareHashAndPassword)
 }
 
 func (m *Manager) checkCredentials(username, password string, compare func([]byte, []byte) error) bool {
-	username = NormalizeUsername(username)
-	hash := m.cfg.Users[username]
+	hash, hasHash := m.credential(NormalizeUsername(username))
 	matched := false
 	realCost, err := bcrypt.Cost([]byte(hash))
-	hasHash := hash != "" && err == nil
+	hasHash = hasHash && err == nil
 	// Compare once at every configured cost, even after a match. Mixed-cost
 	// credential files must not expose usernames through different bcrypt work.
 	for _, cost := range m.costs {
@@ -132,7 +134,7 @@ func (m *Manager) SessionUsername(r *http.Request) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	if !m.hasUser(payloadParts[0]) || !time.Now().Before(time.Unix(expiresUnix, 0)) {
+	if _, ok := m.credential(payloadParts[0]); !ok || !time.Now().Before(time.Unix(expiresUnix, 0)) {
 		return "", false
 	}
 	return payloadParts[0], true
@@ -142,7 +144,7 @@ func (m *Manager) sign(payload string) string {
 	mac := hmac.New(sha256.New, []byte(m.cfg.SessionSecret))
 	_, _ = mac.Write([]byte(payload))
 	username, _, _ := strings.Cut(payload, ":")
-	credential := m.cfg.Users[username]
+	credential, _ := m.credential(username)
 	// Keep the public payload unchanged while revoking cookies after a credential
 	// replacement, including removing and later recreating the same username.
 	_, _ = mac.Write([]byte{0})
