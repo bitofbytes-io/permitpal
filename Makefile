@@ -59,11 +59,13 @@ migrate-status: ## Show Postgres migration status
 docker-build: templ ## Build the Docker image locally
 	docker build -t $(REGISTRY)/$(IMAGE_REPO):$(TAG) .
 
+# METADATA_FILE, when set, receives buildx's build metadata; CI reads the pushed digest from it.
 docker-buildx: templ ## Build and push a multi-arch Docker image
 	docker buildx build \
 		--platform $(PLATFORMS) \
 		--tag $(REGISTRY)/$(IMAGE_REPO):$(TAG) \
 		--tag $(REGISTRY)/$(IMAGE_REPO):latest \
+		$(if $(METADATA_FILE),--metadata-file "$(METADATA_FILE)") \
 		--push \
 		.
 
