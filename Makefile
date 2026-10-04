@@ -65,7 +65,7 @@ docker-buildx: templ ## Build and push a multi-arch Docker image
 		--platform $(PLATFORMS) \
 		--tag $(REGISTRY)/$(IMAGE_REPO):$(TAG) \
 		--tag $(REGISTRY)/$(IMAGE_REPO):latest \
-		$(if $(METADATA_FILE),--metadata-file $(METADATA_FILE)) \
+		$(if $(METADATA_FILE),--metadata-file "$(METADATA_FILE)") \
 		--push \
 		.
 
