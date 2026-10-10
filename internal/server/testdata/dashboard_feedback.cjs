@@ -7,13 +7,16 @@ const { chromium } = require(process.env.PERMITPAL_PLAYWRIGHT_MODULE);
 
 const baseURL = process.argv[2];
 
-// countLoads counts finished requests in window.loaded, a task after every
-// load listener the page added before sending, so htmx and the page have
-// handled the response by the time it changes.
-function countLoads() {
+// countRequests counts sent requests in window.sent as they are sent, and
+// finished ones in window.loaded, a task after every load listener the page
+// added before sending, so htmx and the page have handled the response by
+// the time it changes.
+function countRequests() {
+  window.sent = 0;
   window.loaded = 0;
   const send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function (...args) {
+    window.sent++;
     this.addEventListener("loadend", () => setTimeout(() => window.loaded++));
     return send.apply(this, args);
   };
@@ -49,7 +52,7 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    await page.addInitScript(countLoads);
+    await page.addInitScript(countRequests);
     const problems = [];
     page.on("pageerror", (err) => problems.push(err.message));
     page.on("dialog", (dialog) => {
@@ -161,60 +164,171 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     assert.deepEqual(await alerts(other), []);
     await page.unrouteAll();
 
-    // The update and the nested clear button send separate requests, so
-    // their responses can finish in either order. Only a row's latest
-    // request is handled; an older response changes nothing on the page.
+    // A row sends one save at a time, so an update and a clear never race on
+    // the server. While a save is held in flight, the row's controls are
+    // disabled and trying the other one sends nothing; other rows stay usable.
     let held = [];
     await page.route("**/requirements/use-of-lane", (route) => {
       held.push(route);
     });
-    // releaseInOrder lets the held update (0) and clear (1) reach the server
-    // one at a time, in the given order.
-    const releaseInOrder = async (order) => {
-      await until(() => held.length === 2);
-      for (const i of order) {
-        await settle(page, () => held[i].continue());
+    const rowState = (form) =>
+      form.evaluate((el) => ({
+        rating: el.querySelector("input[name=rating]:checked")?.value ?? "",
+        ratedOn: el.querySelector("[name=rated_on]").value,
+        notes: el.querySelector("[name=notes]").value,
+      }));
+    const controls = (form) => form.locator("button, input");
+    const updateRow = () => row.getByRole("button", { name: "Update Use of lane" }).click();
+    const clearRow = () => row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
+    // Every way to send another save from the row: clicks that bypass the
+    // disabled controls, and scripted submits that bypass them entirely.
+    const secondSaves = [
+      () => row.getByRole("button", { name: "Update Use of lane" }).click({ force: true }),
+      () => row.getByRole("button", { name: "Clear rating for Use of lane" }).click({ force: true }),
+      () => row.evaluate((form) => form.requestSubmit()),
+      () => row.evaluate((form) => window.htmx.trigger(form.querySelector(".clear-rating"), "click")),
+      () => row.evaluate((form) => window.htmx.trigger(form, "submit")),
+    ];
+    // holdFirst sends a save with send and holds it before it reaches the
+    // server. While it waits, the row is busy, other rows are not, and no
+    // second save is sent. The returned release lets the first save through
+    // and checks that no second save was queued behind it either.
+    const holdFirst = async (send) => {
+      await send();
+      await until(() => held.length === 1);
+      for (const control of await controls(row).all()) {
+        assert.equal(await control.isDisabled(), true, "a row control stayed enabled during a save");
       }
-      held = [];
+      for (const control of await controls(other).all()) {
+        assert.equal(await control.isDisabled(), false, "another row was disabled by this row's save");
+      }
+      const sent = await page.evaluate(() => window.sent);
+      for (const save of secondSaves) {
+        await save();
+      }
+      assert.equal(await page.evaluate(() => window.sent), sent, "a second save was sent while the first was in flight");
+      assert.equal(held.length, 1);
+      return async () => {
+        await settle(page, () => held.shift().continue());
+        assert.equal(await page.evaluate(() => window.sent), sent, "a second save was queued behind the first");
+        assert.equal(held.length, 0);
+      };
     };
-    const orders = { "newer response first": [1, 0], "older response first": [0, 1] };
+    // through sends a request with click and lets it reach the server.
+    const through = async (click) => {
+      await click();
+      await until(() => held.length === 1);
+      await settle(page, () => held.shift().continue());
+    };
+    // reloadedRow reloads the dashboard and returns the row's saved state.
+    const reloadedRow = async () => {
+      await page.reload();
+      await page.waitForFunction(() => window.htmx);
+      return rowState(row);
+    };
 
-    // A newer clear wins over an older update the server rejects or saves.
-    // A saved "bad" rating would put Use of lane into practice focus.
-    for (const older of [{ rating: "good", date: "2099-01-01" }, { rating: "bad", date: "2025-03-01" }]) {
-      for (const [when, order] of Object.entries(orders)) {
-        await row.locator(`input[value=${older.rating}]`).check();
-        await row.locator("[name=rated_on]").fill(older.date);
-        await row.getByRole("button", { name: "Update Use of lane" }).click();
-        await row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
-        await releaseInOrder(order);
-        assert.deepEqual(await alerts(row), [], when + ": a stale rejection was reported after a newer save");
-        assert.deepEqual(await statuses(row), ["Saved"], when);
-        assert.equal(await row.locator("input[name=rating]:checked").count(), 0, when);
-        assert.ok(!(await page.locator("#practice-focus").innerText()).includes("Use of lane"), when + ": the older save updated practice focus");
-      }
-    }
+    // The review's case: an update to "bad", then a clear. The clear can only
+    // be sent after the update has been saved, so the clear is what persists.
+    await row.locator("input[value=bad]").check();
+    await row.locator("[name=rated_on]").fill("2025-03-01");
+    await row.locator("[name=notes]").fill("Older");
+    await (await holdFirst(updateRow))();
+    assert.deepEqual(await statuses(row), ["Saved"]);
+    assert.deepEqual(await rowState(row), { rating: "bad", ratedOn: "2025-03-01", notes: "Older" });
+    await through(clearRow);
+    assert.deepEqual(await statuses(row), ["Saved"]);
+    const cleared = await rowState(row);
+    assert.deepEqual(cleared, { rating: "", ratedOn: "", notes: "Older" });
+    assert.deepEqual(await reloadedRow(), cleared, "the saved row differs from what the page showed");
+    assert.ok(!(await page.locator("#practice-focus").innerText()).includes("Use of lane"));
 
+    // A held update the server rejects: the row stays busy until the
+    // rejection arrives, then shows it with the rejected values and is usable
+    // again. A corrected save then persists.
     const tooLong = "<b>" + "x".repeat(1000);
-    for (const [when, order] of Object.entries(orders)) {
-      const focus = await page.locator("#practice-focus").innerText();
-      await row.locator("input[value=bad]").check();
-      await row.locator("[name=rated_on]").fill("2025-03-01");
-      await row.locator("[name=notes]").fill("Older");
-      await row.getByRole("button", { name: "Update Use of lane" }).click();
-      await row.locator("input[value=good]").check();
-      await row.locator("[name=rated_on]").fill("2025-04-01");
-      await row.locator("[name=notes]").fill(tooLong);
-      await row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
-      await releaseInOrder(order);
-      assert.deepEqual(await alerts(row), ["Notes must be 1000 characters or fewer"], when + ": the latest rejection was lost");
-      assert.equal(await row.locator("[role=alert] *").count(), 0, when);
-      assert.deepEqual(await statuses(row), [], when + ": the older save showed as saved");
-      assert.equal(await row.locator("input[name=rating]:checked").getAttribute("value"), "good", when);
-      assert.equal(await row.locator("[name=rated_on]").inputValue(), "2025-04-01", when);
-      assert.equal(await row.locator("[name=notes]").inputValue(), tooLong, when + ": the rejected notes were overwritten");
-      assert.equal(await page.locator("#practice-focus").innerText(), focus, when + ": the older save updated practice focus");
+    await row.locator("input[value=good]").check();
+    await row.locator("[name=rated_on]").fill("2025-04-01");
+    await row.locator("[name=notes]").fill(tooLong);
+    await (await holdFirst(updateRow))();
+    assert.deepEqual(await alerts(row), ["Notes must be 1000 characters or fewer"]);
+    assert.equal(await row.locator("[role=alert] *").count(), 0);
+    assert.deepEqual(await statuses(row), []);
+    assert.deepEqual(await rowState(row), { rating: "good", ratedOn: "2025-04-01", notes: tooLong }, "the rejected values were not kept");
+    for (const control of await controls(row).all()) {
+      assert.equal(await control.isDisabled(), false, "a rejected row stayed disabled");
     }
+    assert.deepEqual(await reloadedRow(), cleared, "a rejected update changed the saved row");
+
+    await row.locator("input[value=good]").check();
+    await row.locator("[name=rated_on]").fill("2025-04-01");
+    await row.locator("[name=notes]").fill("Corrected");
+    await through(updateRow);
+    assert.deepEqual(await alerts(row), []);
+    assert.deepEqual(await statuses(row), ["Saved"]);
+    const corrected = { rating: "good", ratedOn: "2025-04-01", notes: "Corrected" };
+    assert.deepEqual(await rowState(row), corrected);
+    assert.deepEqual(await reloadedRow(), corrected, "the corrected save did not persist");
+
+    // The reverse direction: a clear, then an update. The update can only be
+    // sent after the clear has been saved, so the update is what persists.
+    await (await holdFirst(clearRow))();
+    assert.deepEqual(await statuses(row), ["Saved"]);
+    assert.deepEqual(await rowState(row), { rating: "", ratedOn: "", notes: "Corrected" });
+    await row.locator("input[value=fair]").check();
+    await row.locator("[name=rated_on]").fill("2025-05-01");
+    await row.locator("[name=notes]").fill("After clear");
+    await through(updateRow);
+    assert.deepEqual(await statuses(row), ["Saved"]);
+    const updated = { rating: "fair", ratedOn: "2025-05-01", notes: "After clear" };
+    assert.deepEqual(await rowState(row), updated);
+    assert.deepEqual(await reloadedRow(), updated, "the update after a clear did not persist");
+    await page.unrouteAll();
+
+    // The progress form also sends one save at a time. While a rejected save
+    // is held, its controls are disabled and even a scripted resubmit is
+    // neither sent nor queued. The rejection then shows with the entered
+    // values, and a correction saves without leaving the old error behind.
+    held = [];
+    await page.route("**/profile", (route) => {
+      held.push(route);
+    });
+    const progressForm = page.locator("#progress-form");
+    const hours = async () => [await page.locator("#total_hours").inputValue(), await page.locator("#night_hours").inputValue()];
+    await page.locator("#total_hours").fill("6");
+    await page.locator("#night_hours").fill("6.5");
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await until(() => held.length === 1);
+    for (const control of await controls(progressForm).all()) {
+      assert.equal(await control.isDisabled(), true, "a progress control stayed enabled during a save");
+    }
+    for (const control of await controls(other).all()) {
+      assert.equal(await control.isDisabled(), false, "a row was disabled by the progress save");
+    }
+    const sent = await page.evaluate(() => window.sent);
+    await progressForm.getByRole("button", { name: "Save progress" }).click({ force: true });
+    await progressForm.evaluate((form) => form.requestSubmit());
+    await progressForm.evaluate((form) => window.htmx.trigger(form, "submit"));
+    await settle(page, () => held.shift().continue());
+    assert.equal(await page.evaluate(() => window.sent), sent, "a second progress save was sent or queued during the first");
+    assert.equal(held.length, 0);
+    assert.deepEqual(await alerts(progressForm), ["Night hours cannot be more than total hours"]);
+    assert.deepEqual(await statuses(panel), []);
+    assert.deepEqual(await hours(), ["6", "6.5"], "the rejected hours were not kept");
+    for (const control of await controls(progressForm).all()) {
+      assert.equal(await control.isDisabled(), false, "a rejected progress form stayed disabled");
+    }
+    await page.reload();
+    await page.waitForFunction(() => window.htmx);
+    assert.deepEqual(await hours(), ["4.0", "1.0"], "a rejected progress save changed the saved hours");
+
+    await page.locator("#total_hours").fill("6");
+    await page.locator("#night_hours").fill("2");
+    await through(() => progressForm.getByRole("button", { name: "Save progress" }).click());
+    assert.deepEqual(await alerts(progressForm), []);
+    assert.deepEqual(await statuses(panel), ["Progress saved"]);
+    await page.reload();
+    await page.waitForFunction(() => window.htmx);
+    assert.deepEqual(await hours(), ["6.0", "2.0"], "the corrected progress did not persist");
     await page.unrouteAll();
 
     assert.deepEqual(problems, []);

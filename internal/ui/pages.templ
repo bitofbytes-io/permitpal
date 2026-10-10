@@ -79,7 +79,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 						<aside class="dashboard-side" aria-label="Progress controls">
 							<section class="side-panel">
 								<h2>Update progress</h2>
-								<form id="progress-form" class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML">
+								<form id="progress-form" class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#progress-form button, #progress-form input">
 									<label for="total_hours">Total hours (current)</label>
 									<div class="inline-unit">
 										<input id="total_hours" name="total_hours" type="text" inputmode="decimal" pattern="(60(\.0)?|[0-5]?[0-9](\.[0-9])?|\.[0-9])" title="Enter 0 to 60 hours, with up to one decimal place" autocomplete="off" value={ model.FormatHours(dashboard.Profile.TotalHours) }/>
@@ -137,12 +137,11 @@ templ DashboardPage(dashboard model.Dashboard) {
 			<script nonce={ templ.GetNonce(ctx) }>
 				// htmx does not swap error responses, so show a rejected save's plain-text
 				// message in the form that sent it. The clear-rating button's requests
-				// belong to its row. A row's update and clear requests can overlap, so
-				// only a form's latest request is handled: an older response is dropped
-				// before htmx swaps the row or any out-of-band content.
+				// belong to its row. Each form sends one save at a time (hx-sync and
+				// hx-disabled-elt on the form), so saves from a form never overlap or
+				// queue behind each other.
 				(function () {
 					var forms = "#progress-form, .checklist-row";
-					var latest = {};
 
 					function clearFeedback(form) {
 						var error = form.querySelector(".form-error");
@@ -168,31 +167,18 @@ templ DashboardPage(dashboard model.Dashboard) {
 						if (!form) {
 							return;
 						}
-						var id = form.id;
 						var xhr = event.detail.xhr;
-						latest[id] = xhr;
 						clearFeedback(form);
-						// htmx handles the response first, swapping the row on success.
+						// htmx handles the response first: it swaps the row on success and
+						// re-enables a rejected row's controls.
 						xhr.addEventListener("load", function () {
-							if (latest[id] !== xhr || xhr.status !== 400) {
+							if (xhr.status !== 400) {
 								return;
 							}
-							var current = document.getElementById(id);
-							clearFeedback(current);
-							var error = current.querySelector(".form-error");
+							var error = form.querySelector(".form-error");
 							error.textContent = xhr.responseText.trim();
 							error.hidden = error.textContent === "";
 						});
-					});
-
-					// Cancelling beforeOnLoad makes htmx skip the response entirely. If a
-					// newer save already swapped the row out, the older request's element
-					// went with it; htmx then swaps only within that detached row.
-					document.addEventListener("htmx:beforeOnLoad", function (event) {
-						var form = event.detail.elt.closest(forms);
-						if (form && latest[form.id] !== event.detail.xhr) {
-							event.preventDefault();
-						}
 					});
 				})();
 			</script>
@@ -275,6 +261,8 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 		hx-post={ "/requirements/" + req.Key }
 		hx-target={ "#requirement-" + req.Key }
 		hx-swap="outerHTML"
+		hx-sync="this:drop"
+		hx-disabled-elt={ "#requirement-" + req.Key + " button, #requirement-" + req.Key + " input" }
 	>
 		<div class="row-number">{ fmt.Sprintf("%d", req.SortOrder) }</div>
 		<div class="skill-title">
