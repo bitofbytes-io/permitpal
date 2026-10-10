@@ -79,7 +79,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 						<aside class="dashboard-side" aria-label="Progress controls">
 							<section class="side-panel">
 								<h2>Update progress</h2>
-								<form class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML">
+								<form id="progress-form" class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML">
 									<label for="total_hours">Total hours (current)</label>
 									<div class="inline-unit">
 										<input id="total_hours" name="total_hours" type="text" inputmode="decimal" pattern="(60(\.0)?|[0-5]?[0-9](\.[0-9])?|\.[0-9])" title="Enter 0 to 60 hours, with up to one decimal place" autocomplete="off" value={ model.FormatHours(dashboard.Profile.TotalHours) }/>
@@ -93,6 +93,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 									<label for="permit_issue_date">Permit issue date</label>
 									<input id="permit_issue_date" name="permit_issue_date" type="date" value={ model.DateValue(dashboard.Profile.PermitIssueDate) }/>
 									<button type="submit">Save progress</button>
+									<p class="form-error" role="alert" hidden></p>
 								</form>
 							</section>
 							@PracticeFocus(dashboard, false)
@@ -133,6 +134,57 @@ templ DashboardPage(dashboard model.Dashboard) {
 					</footer>
 				</main>
 			</div>
+			<script nonce={ templ.GetNonce(ctx) }>
+				// htmx does not swap error responses, so show a rejected save's plain-text
+				// message in the form that sent it. The clear-rating button's requests
+				// belong to its row, and only a form's latest request reports: the
+				// request and the clear button can overlap, and either may swap the row.
+				(function () {
+					var forms = "#progress-form, .checklist-row";
+					var latest = {};
+
+					function clearFeedback(form) {
+						var error = form.querySelector(".form-error");
+						error.hidden = true;
+						error.textContent = "";
+						if (form.id === "progress-form") {
+							var progressSaved = document.querySelector("#progress-panel .save-feedback");
+							if (progressSaved) {
+								progressSaved.remove();
+							}
+							return;
+						}
+						var rowSaved = form.querySelector(".row-save-feedback");
+						if (rowSaved) {
+							var ok = document.createElement("span");
+							ok.textContent = "OK";
+							rowSaved.replaceWith(ok);
+						}
+					}
+
+					document.addEventListener("htmx:beforeRequest", function (event) {
+						var form = event.detail.elt.closest(forms);
+						if (!form) {
+							return;
+						}
+						var id = form.id;
+						var xhr = event.detail.xhr;
+						latest[id] = xhr;
+						clearFeedback(form);
+						// htmx handles the response first, swapping the row on success.
+						xhr.addEventListener("load", function () {
+							if (latest[id] !== xhr || xhr.status !== 400) {
+								return;
+							}
+							var current = document.getElementById(id);
+							clearFeedback(current);
+							var error = current.querySelector(".form-error");
+							error.textContent = xhr.responseText.trim();
+							error.hidden = error.textContent === "";
+						});
+					});
+				})();
+			</script>
 		</body>
 	</html>
 }
@@ -247,6 +299,7 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 				<span>OK</span>
 			}
 		</button>
+		<p class="form-error" role="alert" hidden></p>
 	</form>
 }
 
