@@ -137,8 +137,9 @@ templ DashboardPage(dashboard model.Dashboard) {
 			<script nonce={ templ.GetNonce(ctx) }>
 				// htmx does not swap error responses, so show a rejected save's plain-text
 				// message in the form that sent it. The clear-rating button's requests
-				// belong to its row, and only a form's latest request reports: the
-				// request and the clear button can overlap, and either may swap the row.
+				// belong to its row. A row's update and clear requests can overlap, so
+				// only a form's latest request is handled: an older response is dropped
+				// before htmx swaps the row or any out-of-band content.
 				(function () {
 					var forms = "#progress-form, .checklist-row";
 					var latest = {};
@@ -182,6 +183,16 @@ templ DashboardPage(dashboard model.Dashboard) {
 							error.textContent = xhr.responseText.trim();
 							error.hidden = error.textContent === "";
 						});
+					});
+
+					// Cancelling beforeOnLoad makes htmx skip the response entirely. If a
+					// newer save already swapped the row out, the older request's element
+					// went with it; htmx then swaps only within that detached row.
+					document.addEventListener("htmx:beforeOnLoad", function (event) {
+						var form = event.detail.elt.closest(forms);
+						if (form && latest[form.id] !== event.detail.xhr) {
+							event.preventDefault();
+						}
 					});
 				})();
 			</script>

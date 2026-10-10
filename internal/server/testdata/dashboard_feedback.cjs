@@ -19,11 +19,17 @@ function countLoads() {
   };
 }
 
-// settle runs action and waits until count more requests have been handled.
+// settle runs action and waits until count more requests have been handled
+// and htmx has settled any swapped content. htmx wires up swapped-in rows
+// only when it settles them, and removes the classes below once it has.
 async function settle(page, action, count = 1) {
   const loaded = await page.evaluate(() => window.loaded);
   await action();
-  await page.waitForFunction((want) => window.loaded >= want, loaded + count, { timeout: 5000 });
+  await page.waitForFunction(
+    (want) => window.loaded >= want && !document.querySelector(".htmx-swapping, .htmx-settling, .htmx-added"),
+    loaded + count,
+    { timeout: 5000 },
+  );
 }
 
 async function until(check) {
@@ -157,33 +163,58 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
 
     // The update and the nested clear button send separate requests, so
     // their responses can finish in either order. Only a row's latest
-    // request reports, even after an older one has swapped the row.
+    // request is handled; an older response changes nothing on the page.
     let held = [];
     await page.route("**/requirements/use-of-lane", (route) => {
       held.push(route);
     });
-    await row.locator("input[value=good]").check();
-    await row.locator("[name=rated_on]").fill("2099-01-01");
-    await row.getByRole("button", { name: "Update Use of lane" }).click();
-    await row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
-    await until(() => held.length === 2);
-    await settle(page, () => held[1].continue());
-    await settle(page, () => held[0].continue());
-    assert.deepEqual(await alerts(row), [], "a stale rejection was reported after a newer save");
-    assert.deepEqual(await statuses(row), ["Saved"]);
+    // releaseInOrder lets the held update (0) and clear (1) reach the server
+    // one at a time, in the given order.
+    const releaseInOrder = async (order) => {
+      await until(() => held.length === 2);
+      for (const i of order) {
+        await settle(page, () => held[i].continue());
+      }
+      held = [];
+    };
+    const orders = { "newer response first": [1, 0], "older response first": [0, 1] };
 
-    held = [];
-    await row.locator("input[value=fair]").check();
-    await row.locator("[name=rated_on]").fill("2025-03-01");
-    await row.locator("[name=notes]").fill("Older");
-    await row.getByRole("button", { name: "Update Use of lane" }).click();
-    await row.locator("[name=notes]").fill("x".repeat(1001));
-    await row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
-    await until(() => held.length === 2);
-    await settle(page, () => held[0].continue());
-    await settle(page, () => held[1].continue());
-    assert.deepEqual(await alerts(row), ["Notes must be 1000 characters or fewer"], "the latest rejection was lost after an older save");
-    assert.deepEqual(await statuses(row), []);
+    // A newer clear wins over an older update the server rejects or saves.
+    // A saved "bad" rating would put Use of lane into practice focus.
+    for (const older of [{ rating: "good", date: "2099-01-01" }, { rating: "bad", date: "2025-03-01" }]) {
+      for (const [when, order] of Object.entries(orders)) {
+        await row.locator(`input[value=${older.rating}]`).check();
+        await row.locator("[name=rated_on]").fill(older.date);
+        await row.getByRole("button", { name: "Update Use of lane" }).click();
+        await row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
+        await releaseInOrder(order);
+        assert.deepEqual(await alerts(row), [], when + ": a stale rejection was reported after a newer save");
+        assert.deepEqual(await statuses(row), ["Saved"], when);
+        assert.equal(await row.locator("input[name=rating]:checked").count(), 0, when);
+        assert.ok(!(await page.locator("#practice-focus").innerText()).includes("Use of lane"), when + ": the older save updated practice focus");
+      }
+    }
+
+    const tooLong = "<b>" + "x".repeat(1000);
+    for (const [when, order] of Object.entries(orders)) {
+      const focus = await page.locator("#practice-focus").innerText();
+      await row.locator("input[value=bad]").check();
+      await row.locator("[name=rated_on]").fill("2025-03-01");
+      await row.locator("[name=notes]").fill("Older");
+      await row.getByRole("button", { name: "Update Use of lane" }).click();
+      await row.locator("input[value=good]").check();
+      await row.locator("[name=rated_on]").fill("2025-04-01");
+      await row.locator("[name=notes]").fill(tooLong);
+      await row.getByRole("button", { name: "Clear rating for Use of lane" }).click();
+      await releaseInOrder(order);
+      assert.deepEqual(await alerts(row), ["Notes must be 1000 characters or fewer"], when + ": the latest rejection was lost");
+      assert.equal(await row.locator("[role=alert] *").count(), 0, when);
+      assert.deepEqual(await statuses(row), [], when + ": the older save showed as saved");
+      assert.equal(await row.locator("input[name=rating]:checked").getAttribute("value"), "good", when);
+      assert.equal(await row.locator("[name=rated_on]").inputValue(), "2025-04-01", when);
+      assert.equal(await row.locator("[name=notes]").inputValue(), tooLong, when + ": the rejected notes were overwritten");
+      assert.equal(await page.locator("#practice-focus").innerText(), focus, when + ": the older save updated practice focus");
+    }
     await page.unrouteAll();
 
     assert.deepEqual(problems, []);
