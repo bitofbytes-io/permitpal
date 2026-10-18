@@ -20,10 +20,11 @@ func requirementRowClass(rating model.RequirementRating) string {
 }
 
 // estimateLabel introduces the ready date: an hours-pace projection, or the
-// fixed day the permit hold ends.
+// fixed day the permit hold ends. The hold label claims no more than that,
+// since the age requirement is not tracked.
 func estimateLabel(waitingOn model.ReadyConstraint) string {
 	if waitingOn == model.ConstraintPermitHold {
-		return "Eligible on"
+		return "Hold ends"
 	}
 	return "On pace for"
 }

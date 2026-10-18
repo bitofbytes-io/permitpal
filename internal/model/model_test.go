@@ -141,11 +141,11 @@ func TestEstimateHoldsUntilNineMonthsAfterIssue(t *testing.T) {
 		total, night float64
 		want         string
 	}{
-		{"hours complete on issue date", time.Date(2026, 1, 1, 20, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
+		{"hours complete on issue date", time.Date(2026, 1, 1, 20, 0, 0, 0, time.UTC), 60, 10, "Hold ends October 1, 2026"},
 		{"hours started on issue date", time.Date(2026, 1, 1, 20, 0, 0, 0, time.UTC), 60, 4, "Add hours to estimate"},
-		{"pace ahead of hold", time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), 40, 10, "Eligible on October 1, 2026"},
-		{"hours complete before hold", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
-		{"day before hold ends", time.Date(2026, 9, 30, 23, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
+		{"pace ahead of hold", time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), 40, 10, "Hold ends October 1, 2026"},
+		{"hours complete before hold", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), 60, 10, "Hold ends October 1, 2026"},
+		{"day before hold ends", time.Date(2026, 9, 30, 23, 0, 0, 0, time.UTC), 60, 10, "Hold ends October 1, 2026"},
 		{"hold ends today", time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), 60, 10, "Ready when every skill is rated Good"},
 	}
 	for _, tt := range tests {
@@ -166,11 +166,11 @@ func TestEstimateHoldClampsToMonthEnd(t *testing.T) {
 		want  string
 	}{
 		// February 2027 has no 31st, so the hold ends on its last day.
-		{time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), "Eligible on February 28, 2027"},
-		{time.Date(2027, 5, 31, 0, 0, 0, 0, time.UTC), "Eligible on February 29, 2028"},
-		{time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), "Eligible on April 30, 2027"},
-		{time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC), "Eligible on February 28, 2027"},
-		{time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC), "Eligible on February 15, 2027"},
+		{time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), "Hold ends February 28, 2027"},
+		{time.Date(2027, 5, 31, 0, 0, 0, 0, time.UTC), "Hold ends February 29, 2028"},
+		{time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), "Hold ends April 30, 2027"},
+		{time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC), "Hold ends February 28, 2027"},
+		{time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC), "Hold ends February 15, 2027"},
 	}
 	for _, tt := range tests {
 		profile := Profile{PermitIssueDate: &tt.start, TotalHours: 60, NightHours: 10}
@@ -185,7 +185,7 @@ func estimateText(estimate ReadyEstimate) string {
 	if estimate.Date != nil {
 		label := "On pace for "
 		if estimate.WaitingOn == ConstraintPermitHold {
-			label = "Eligible on "
+			label = "Hold ends "
 		}
 		return label + estimate.Date.Format("January 2, 2006")
 	}
