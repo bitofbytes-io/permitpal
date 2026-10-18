@@ -6,12 +6,13 @@
   "packageRules": [
     {
       "description": "One weekly PR for every non-major update (Go modules, Docker base images).",
-      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
       "groupName": "all non-major dependencies"
     },
     {
-      "description": "One weekly PR for GitHub Actions updates. Listed after the non-major rule so it takes precedence for this manager.",
+      "description": "One weekly PR for non-major GitHub Actions updates. Listed after the non-major rule so it takes precedence for this manager; major Action updates stay separate PRs.",
       "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
       "groupName": "GitHub Actions"
     },
     {
