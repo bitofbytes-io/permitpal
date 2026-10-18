@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -42,7 +43,27 @@ func scrape(t *testing.T, h http.Handler) string {
 	return rec.Body.String()
 }
 
+// seriesValue returns the sample value of series in a text exposition, or 0
+// when the series is absent.
+func seriesValue(body, series string) float64 {
+	for _, line := range strings.Split(body, "\n") {
+		if value, ok := strings.CutPrefix(line, series+" "); ok {
+			parsed, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return -1
+			}
+			return parsed
+		}
+	}
+	return 0
+}
+
 func TestMetricsExposeREDAndDomainSeriesWithRoutePatterns(t *testing.T) {
+	// The collectors are package-wide, so compare counts before and after
+	// rather than absolute totals; repeated runs (-count=2) then still pass.
+	h := Handler(NewRegistry())
+	before := scrape(t, h)
+
 	router := testRouter()
 	serve(t, router, http.MethodGet, "/drivers/42?token=secret")
 	serve(t, router, http.MethodGet, "/drivers/43")
@@ -52,17 +73,23 @@ func TestMetricsExposeREDAndDomainSeriesWithRoutePatterns(t *testing.T) {
 	serve(t, router, http.MethodGet, "/health")
 	LoginFailure(LoginInvalidPassword)
 
-	body := scrape(t, Handler(NewRegistry()))
+	body := scrape(t, h)
+	for series, delta := range map[string]float64{
+		`http_requests_total{code="200",method="GET",route="/drivers/{id}"}`:                 2,
+		`http_requests_total{code="422",method="POST",route="/requirements/{key}"}`:          1,
+		`http_requests_total{code="404",method="GET",route="unmatched"}`:                     1,
+		`http_requests_total{code="405",method="OTHER",route="unmatched"}`:                   1,
+		`http_request_duration_seconds_count{code="200",method="GET",route="/drivers/{id}"}`: 2,
+		`permitpal_login_failures_total{reason="invalid_password"}`:                          1,
+		`permitpal_login_failures_total{reason="rate_limited"}`:                              0,
+	} {
+		if got := seriesValue(body, series) - seriesValue(before, series); got != delta {
+			t.Errorf("%s increased by %v, want %v", series, got, delta)
+		}
+	}
 	for _, want := range []string{
-		`http_requests_total{code="200",method="GET",route="/drivers/{id}"} 2`,
-		`http_requests_total{code="422",method="POST",route="/requirements/{key}"} 1`,
-		`http_requests_total{code="404",method="GET",route="unmatched"} 1`,
-		`route="/drivers/{id}"`,
-		`method="OTHER"`,
 		`http_request_duration_seconds_bucket{code="200",method="GET",route="/drivers/{id}",le="0.005"}`,
-		`http_request_duration_seconds_count{code="200",method="GET",route="/drivers/{id}"} 2`,
-		`permitpal_login_failures_total{reason="invalid_password"} 1`,
-		`permitpal_login_failures_total{reason="rate_limited"} 0`,
+		`permitpal_login_failures_total{reason="rate_limited"} `,
 		"go_goroutines ",
 		"process_start_time_seconds ",
 	} {
