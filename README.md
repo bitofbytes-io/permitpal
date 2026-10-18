@@ -56,6 +56,7 @@ Accounts come only from `PERMITPAL_USERS` or the users file. An explicitly empty
 | `PORT` | No | HTTP port; defaults to `4600` |
 | `LOG_LEVEL` | No | Application log level; defaults to `info` |
 | `APP_TIMEZONE` | No | IANA time zone that decides "today" for rating dates and pace estimates; defaults to `America/New_York`. Time zone data is built into the binary |
+| `METRICS_ADDR` | No | Listen address of the internal Prometheus `/metrics` listener; defaults to `:9464`. `off` disables it |
 | `TRUSTED_PROXY_CIDRS` | Behind a reverse proxy | Comma-separated CIDRs or IPs whose `X-Forwarded-For` header is trusted; defaults to empty, which ignores forwarded headers and disables the per-IP login limit |
 
 Failed logins are limited to 20 per username and, when the real client IP is known, 20 per client IP in a 15-minute window; further attempts get HTTP 429 with `Retry-After` until the window ends, and a successful login clears that username's failures. Counters are in memory per replica and reset on restart. The per-IP limit applies only when `TRUSTED_PROXY_CIDRS` is set: a peer outside those CIDRs is a direct client keyed by its TCP address, and a peer inside them is keyed by the rightmost `X-Forwarded-For` address that is not a trusted proxy. With `TRUSTED_PROXY_CIDRS` empty, or when a trusted proxy sends no usable `X-Forwarded-For`, only the username limit applies. The username limit lets anyone lock a known username out for 15 minutes. A username that cannot exist under the rule below fails without a password check and counts only toward the per-IP limit. The limiter tracks at most 10,000 keys and evicts the oldest window beyond that. Behind Traefik on a Docker Swarm overlay network, set `TRUSTED_PROXY_CIDRS` to that network's subnet, for example the output of `docker network inspect proxy --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}'`.
@@ -102,6 +103,13 @@ Open <http://localhost:4600>. Two unauthenticated probes report status:
 
 - `/health` returns `200 ok` whenever the process is up. It checks nothing else.
 - `/ready` pings the database with a 2-second timeout. It returns `200 {"status":"ok","db":"ok"}`, or `503 {"status":"degraded","db":"error"}` when the database does not answer; the cause goes to the log, not the response. With `DATA_STORE=memory` it always reports ok.
+
+Prometheus metrics are served at `GET /metrics` on a separate internal listener, `METRICS_ADDR` (default `:9464`), and never on the public port, where `/metrics` returns 404. The Dockerfile does not publish that port, so only peers on the container's network, such as a Prometheus job scraping over the Swarm overlay, can reach it. If the address cannot be bound, PermitPal logs the error and keeps serving without metrics; `METRICS_ADDR=off` turns the listener off. The metrics are:
+
+- `http_requests_total` and `http_request_duration_seconds`, labelled by `method`, chi route pattern (`route`, such as `/requirements/{key}`; requests that match no route, or that a middleware refuses before routing, use `unmatched`) and status `code`. `/health`, `/ready` and `/metrics` are not counted.
+- `pgxpool_*` connection pool statistics, such as `pgxpool_acquired_conns`, `pgxpool_idle_conns`, `pgxpool_total_conns`, `pgxpool_max_conns` and `pgxpool_empty_acquire_wait_seconds_total`, with `DATA_STORE=postgres`.
+- `permitpal_login_failures_total{reason}`, where `reason` is `invalid_request`, `rate_limited`, `invalid_username` or `invalid_password`.
+- The Go runtime (`go_*`) and process (`process_*`) collectors.
 
 For a disposable preview, clear the production database secret path and pass a users line:
 

@@ -77,6 +77,23 @@ func TestLoadNormalizesLogLevel(t *testing.T) {
 	}
 }
 
+func TestLoadMetricsAddr(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("PERMITPAL_USERS", "driver:"+testHash)
+	t.Setenv("SESSION_SECRET", "local-session-secret-32-bytes-ok")
+
+	for value, want := range map[string]string{"": ":9464", " 127.0.0.1:9100 ": "127.0.0.1:9100", "off": "off"} {
+		t.Setenv("METRICS_ADDR", value)
+		cfg, err := Load()
+		if err != nil {
+			t.Fatalf("Load returned error: %v", err)
+		}
+		if cfg.MetricsAddr != want {
+			t.Fatalf("METRICS_ADDR=%q: MetricsAddr = %q, want %q", value, cfg.MetricsAddr, want)
+		}
+	}
+}
+
 func TestLoadFailsForMissingExplicitSecretFile(t *testing.T) {
 	clearAuthEnv(t)
 	t.Setenv("PERMITPAL_USERS", "driver:"+testHash)

@@ -18,6 +18,11 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{db: db}
 }
 
+// Pool returns the connection pool, for exporting its statistics.
+func (s *PostgresStore) Pool() *pgxpool.Pool {
+	return s.db
+}
+
 func (s *PostgresStore) Ping(ctx context.Context) error {
 	return s.db.Ping(ctx)
 }

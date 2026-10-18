@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,8 +12,10 @@ import (
 	"time"
 
 	"github.com/drywaters/permitpal/internal/config"
+	"github.com/drywaters/permitpal/internal/metrics"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/server"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -32,11 +35,27 @@ func main() {
 	defer closeStore()
 
 	srv := server.New(cfg, store, logger).HTTPServer()
+	// Bind the public port before the optional metrics listener, so a port
+	// collision disables metrics instead of stopping PermitPal.
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
+		logger.Error("server failed", "error", err)
+		closeStore()
+		os.Exit(1)
+	}
+
+	var poolCollectors []prometheus.Collector
+	if pg, ok := store.(*repository.PostgresStore); ok {
+		poolCollectors = append(poolCollectors, metrics.NewPoolCollector(pg.Pool()))
+	}
+	// The metrics listener is internal and separate from the public router, so
+	// Traefik's public routes cannot reach /metrics.
+	metricsSrv := metrics.Start(cfg.MetricsAddr, metrics.NewRegistry(poolCollectors...))
 
 	serverErr := make(chan error, 1)
 	go func() {
 		logger.Info("permitpal listening", "port", cfg.Port, "data_store", cfg.DataStore)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
 	}()
@@ -53,6 +72,9 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("server shutdown failed", "error", err)
+	}
+	if err := metricsSrv.Shutdown(ctx); err != nil {
+		logger.Error("metrics shutdown failed", "error", err)
 	}
 }
 
