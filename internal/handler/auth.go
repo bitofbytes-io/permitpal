@@ -9,6 +9,7 @@ import (
 
 	"github.com/drywaters/permitpal/internal/auth"
 	"github.com/drywaters/permitpal/internal/config"
+	"github.com/drywaters/permitpal/internal/metrics"
 	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/ui"
@@ -34,7 +35,8 @@ func (h *AuthHandler) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		slog.Info("login failed", "reason", "invalid_request")
+		slog.Info("login failed", "reason", metrics.LoginInvalidRequest)
+		metrics.LoginFailure(metrics.LoginInvalidRequest)
 		render(w, r, ui.LoginPage("Could not read that login. Try again.", ""))
 		return
 	}
@@ -53,18 +55,21 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	logAttrs := []any{"username", truncateRunes(username, maxLoggedUsername), "username_length", len(username), "client_ip", clientIP, "client_ip_verified", ipVerified}
 	if wait, ok := h.limiter.Allow(limitIP, limitUsername); !ok {
-		slog.Warn("login failed", append([]any{"reason", "rate_limited"}, logAttrs...)...)
+		slog.Warn("login failed", append([]any{"reason", metrics.LoginRateLimited}, logAttrs...)...)
+		metrics.LoginFailure(metrics.LoginRateLimited)
 		w.Header().Set("Retry-After", strconv.Itoa(int(math.Ceil(wait.Seconds()))))
 		renderStatus(w, r, http.StatusTooManyRequests, ui.LoginPage("Too many failed login attempts. Try again later.", r.FormValue("username")))
 		return
 	}
 	if !validUsername {
-		slog.Info("login failed", append([]any{"reason", "invalid_username"}, logAttrs...)...)
+		slog.Info("login failed", append([]any{"reason", metrics.LoginInvalidUsername}, logAttrs...)...)
+		metrics.LoginFailure(metrics.LoginInvalidUsername)
 		render(w, r, ui.LoginPage("That username and password did not match.", r.FormValue("username")))
 		return
 	}
 	if !h.auth.CheckCredentials(username, r.FormValue("password")) {
-		slog.Info("login failed", append([]any{"reason", "invalid_password"}, logAttrs...)...)
+		slog.Info("login failed", append([]any{"reason", metrics.LoginInvalidPassword}, logAttrs...)...)
+		metrics.LoginFailure(metrics.LoginInvalidPassword)
 		render(w, r, ui.LoginPage("That username and password did not match.", r.FormValue("username")))
 		return
 	}

@@ -37,6 +37,8 @@ type Config struct {
 	TrustedProxies []netip.Prefix
 	// Location decides the calendar date for "today" and submitted dates.
 	Location *time.Location
+	// MetricsAddr is the internal metrics listen address, or "off".
+	MetricsAddr string
 }
 
 func Load() (*Config, error) {
@@ -51,6 +53,7 @@ func Load() (*Config, error) {
 	cfg.DataStore = strings.ToLower(getEnv("DATA_STORE", defaultDataStore(cfg.AppEnv)))
 	cfg.LogLevel = strings.ToLower(strings.TrimSpace(getEnv("LOG_LEVEL", "info")))
 	cfg.Port = getEnv("PORT", "4600")
+	cfg.MetricsAddr = strings.TrimSpace(getEnv("METRICS_ADDR", ":9464"))
 	cfg.DatabaseURL, err = getEnvOrFile("DATABASE_URL", "/run/secrets/permitpal_database_url")
 	if err != nil {
 		return nil, err

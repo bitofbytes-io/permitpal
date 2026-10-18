@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/drywaters/permitpal/internal/config"
+	"github.com/drywaters/permitpal/internal/metrics"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/drywaters/permitpal/internal/server"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
@@ -30,6 +32,14 @@ func main() {
 		os.Exit(1)
 	}
 	defer closeStore()
+
+	var poolCollectors []prometheus.Collector
+	if pg, ok := store.(*repository.PostgresStore); ok {
+		poolCollectors = append(poolCollectors, metrics.NewPoolCollector(pg.Pool()))
+	}
+	// The metrics listener is internal and separate from the public router, so
+	// Traefik's public routes cannot reach /metrics.
+	metricsSrv := metrics.Start(cfg.MetricsAddr, metrics.NewRegistry(poolCollectors...))
 
 	srv := server.New(cfg, store, logger).HTTPServer()
 
@@ -53,6 +63,9 @@ func main() {
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("server shutdown failed", "error", err)
+	}
+	if err := metricsSrv.Shutdown(ctx); err != nil {
+		logger.Error("metrics shutdown failed", "error", err)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/drywaters/permitpal/internal/auth"
 	"github.com/drywaters/permitpal/internal/config"
 	"github.com/drywaters/permitpal/internal/handler"
+	"github.com/drywaters/permitpal/internal/metrics"
 	"github.com/drywaters/permitpal/internal/middleware"
 	"github.com/drywaters/permitpal/internal/repository"
 	"github.com/go-chi/chi/v5"
@@ -54,6 +55,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(chimw.RequestID)
 	r.Use(middleware.RealIP(s.cfg.TrustedProxies))
 	r.Use(middleware.Logger)
+	r.Use(metrics.Middleware)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(requestTimeout))
 	r.Use(middleware.SecurityHeaders)
