@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Weekly dependency updates for Go modules, GitHub Actions, and Dockerfile base images. Major updates stay separate PRs.",
+  "extends": ["config:recommended"],
+  "schedule": ["* * * * 4"],
+  "packageRules": [
+    {
+      "description": "One weekly PR for every non-major update (Go modules, Docker base images).",
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "groupName": "all non-major dependencies"
+    },
+    {
+      "description": "One weekly PR for non-major GitHub Actions updates. Listed after the non-major rule so it takes precedence for this manager; major Action updates stay separate PRs.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Pin Dockerfile base images by digest.",
+      "matchManagers": ["dockerfile"],
+      "pinDigests": true
+    }
+  ]
+}
