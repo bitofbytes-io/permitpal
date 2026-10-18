@@ -19,6 +19,8 @@ type Store interface {
 	GetTracker(ctx context.Context, driverID int64) (model.Tracker, error)
 	UpdateProfile(ctx context.Context, driverID int64, profile model.Profile) (model.Profile, error)
 	UpdateRequirement(ctx context.Context, driverID int64, req model.Requirement) (model.Requirement, error)
+	// Ping reports whether the backing database is reachable.
+	Ping(ctx context.Context) error
 }
 
 type CloseFunc func()

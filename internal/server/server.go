@@ -60,11 +60,9 @@ func (s *Server) Router() http.Handler {
 	r.Use(middleware.RequireSameOrigin)
 	r.Use(middleware.LimitBodyBytes(16 * 1024))
 
-	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	// /health means the process is up; /ready also requires the database.
+	r.Get("/health", handler.Health)
+	r.Get("/ready", handler.Ready(s.store))
 
 	fileServer := http.FileServer(filesOnly{http.Dir("static")})
 	r.Handle("/static/*", http.StripPrefix("/static/", fileServer))
