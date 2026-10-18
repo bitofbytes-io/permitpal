@@ -21,6 +21,7 @@ type MemoryStore struct {
 func NewMemoryStore(_ time.Time) *MemoryStore {
 	return &MemoryStore{drivers: make(map[string]*driverState)}
 }
+func (s *MemoryStore) Ping(context.Context) error { return nil }
 func (s *MemoryStore) EnsureDriver(_ context.Context, username string, now time.Time) (model.Driver, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

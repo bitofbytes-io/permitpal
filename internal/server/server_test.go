@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -315,6 +316,37 @@ func TestLoginRateLimits(t *testing.T) {
 		failFromOneIP(t, login, "203.0.113.7:4000", func(i int) string { return fmt.Sprintf("198.51.100.%d", i) })
 		assertBlocked(t, login("203.0.113.7:4000", "198.51.100.200", "aiden", "test-password"))
 	})
+}
+
+type unreachableStore struct{ repository.Store }
+
+func (unreachableStore) Ping(context.Context) error { return errors.New("connection refused") }
+
+func TestHealthAndReadySkipAuth(t *testing.T) {
+	for name, tc := range map[string]struct {
+		store      func(repository.Store) repository.Store
+		path       string
+		wantStatus int
+		wantBody   string
+	}{
+		"health":         {func(s repository.Store) repository.Store { return s }, "/health", http.StatusOK, "ok"},
+		"ready":          {func(s repository.Store) repository.Store { return s }, "/ready", http.StatusOK, `{"status":"ok","db":"ok"}`},
+		"health db down": {func(s repository.Store) repository.Store { return unreachableStore{s} }, "/health", http.StatusOK, "ok"},
+		"ready db down":  {func(s repository.Store) repository.Store { return unreachableStore{s} }, "/ready", http.StatusServiceUnavailable, `{"status":"degraded","db":"error"}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			app := newTestApp(t)
+			app.store = tc.store(app.store)
+			ts := httptest.NewServer(app.Router())
+			defer ts.Close()
+			// No session cookie and no redirects: the probe must answer directly.
+			client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+			res := doGet(t, client, ts.URL+tc.path)
+			if body := strings.TrimSpace(readBody(t, res)); res.StatusCode != tc.wantStatus || body != tc.wantBody {
+				t.Fatalf("GET %s: status=%d body=%q; want %d %s", tc.path, res.StatusCode, body, tc.wantStatus, tc.wantBody)
+			}
+		})
+	}
 }
 
 func TestHTTPServerSetsEveryTimeout(t *testing.T) {

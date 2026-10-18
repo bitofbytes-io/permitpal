@@ -18,6 +18,10 @@ func NewPostgresStore(db *pgxpool.Pool) *PostgresStore {
 	return &PostgresStore{db: db}
 }
 
+func (s *PostgresStore) Ping(ctx context.Context) error {
+	return s.db.Ping(ctx)
+}
+
 func (s *PostgresStore) GetTracker(ctx context.Context, driverID int64) (model.Tracker, error) {
 	profile, err := s.getProfile(ctx, driverID)
 	if err != nil {

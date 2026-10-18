@@ -98,7 +98,10 @@ docker run --rm --name permitpal --network permitpal \
   permitpal:local
 ```
 
-Open <http://localhost:4600>. The health endpoint is <http://localhost:4600/health>.
+Open <http://localhost:4600>. Two unauthenticated probes report status:
+
+- `/health` returns `200 ok` whenever the process is up. It checks nothing else.
+- `/ready` pings the database with a 2-second timeout. It returns `200 {"status":"ok","db":"ok"}`, or `503 {"status":"degraded","db":"error"}` when the database does not answer; the cause goes to the log, not the response. With `DATA_STORE=memory` it always reports ok.
 
 For a disposable preview, clear the production database secret path and pass a users line:
 
