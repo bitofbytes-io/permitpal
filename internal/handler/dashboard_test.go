@@ -92,6 +92,10 @@ func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "Progress saved") {
 		t.Fatalf("body = %q, want Progress saved feedback", rec.Body.String())
 	}
+	// The countdown follows the saved permit issue date.
+	if !strings.Contains(rec.Body.String(), `id="whats-left"`) || !strings.Contains(rec.Body.String(), "Oct 15, 2026") {
+		t.Fatalf("body = %q, want the refreshed hold countdown", rec.Body.String())
+	}
 }
 
 func TestRequirementNotesLengthLimit(t *testing.T) {

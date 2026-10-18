@@ -72,6 +72,7 @@ type Dashboard struct {
 	Requirements  []Requirement
 	PracticeFocus []Requirement
 	ReadyEstimate ReadyEstimate
+	PermitHold    PermitHold
 	TotalPercent  int
 	NightPercent  int
 	GoodCount     int
@@ -94,7 +95,7 @@ func NewDashboard(driver Driver, profile Profile, requirements []Requirement, no
 			}
 		}
 	}
-	return Dashboard{Driver: driver, Profile: profile, Requirements: ordered, PracticeFocus: focus, ReadyEstimate: EstimateReadyDate(profile, now), TotalPercent: Percent(profile.TotalHours, TotalHoursRequired), NightPercent: Percent(profile.NightHours, NightHoursRequired), GoodCount: good}
+	return Dashboard{Driver: driver, Profile: profile, Requirements: ordered, PracticeFocus: focus, ReadyEstimate: EstimateReadyDate(profile, now), PermitHold: NewPermitHold(profile, now), TotalPercent: Percent(profile.TotalHours, TotalHoursRequired), NightPercent: Percent(profile.NightHours, NightHoursRequired), GoodCount: good}
 }
 
 func Percent(value, target float64) int {
@@ -151,13 +152,52 @@ func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	if nightDate.After(readyDate) {
 		readyDate, waitingOn = nightDate, ConstraintNightHours
 	}
-	if holdEnd := addMonths(startDate, MinPermitHoldMonths); holdEnd.After(readyDate) {
+	if holdEnd := permitHoldEnd(startDate); holdEnd.After(readyDate) {
 		readyDate, waitingOn = holdEnd, ConstraintPermitHold
 	}
 	if !readyDate.After(today) {
 		return ReadyEstimate{Hint: "Ready when every skill is rated Good"}
 	}
 	return ReadyEstimate{Date: &readyDate, WaitingOn: waitingOn}
+}
+
+// PermitHold counts down to the day the permit hold ends. Ends is nil until
+// the permit issue date is set; DaysLeft is 0 once the hold is over.
+type PermitHold struct {
+	Ends     *time.Time
+	DaysLeft int
+}
+
+func NewPermitHold(profile Profile, now time.Time) PermitHold {
+	if profile.PermitIssueDate == nil {
+		return PermitHold{}
+	}
+	ends := permitHoldEnd(startOfDay(*profile.PermitIssueDate))
+	days := int(math.Round(ends.Sub(startOfDay(now)).Hours() / 24))
+	return PermitHold{Ends: &ends, DaysLeft: max(days, 0)}
+}
+
+// RoadTestStep is a road-test requirement that the hour counts and skill
+// ratings do not track.
+type RoadTestStep struct {
+	Title  string
+	Detail string
+}
+
+// RoadTestSteps lists what the driver needs besides hours, skills and the
+// permit hold. While the hold runs, the road-test step gives the earliest
+// test date without saying when appointments open, which can change.
+func RoadTestSteps(hold PermitHold) []RoadTestStep {
+	roadTest := "Book a road test appointment."
+	if hold.Ends != nil && hold.DaysLeft > 0 {
+		roadTest = "The test date must be " + DisplayDate(hold.Ends) + " or later."
+	}
+	return []RoadTestStep{
+		{"Be at least 16", "The minimum age for a Level 2 license."},
+		{"6 months with no violations", "No moving, seat belt, or cell phone convictions."},
+		{"Proof of insurance", "Bring proof of liability insurance to the DMV."},
+		{"Schedule the road test", roadTest},
+	}
 }
 
 func FormatHours(hours float64) string {
@@ -256,6 +296,12 @@ func addMonths(date time.Time, months int) time.Time {
 	firstOfTarget := time.Date(y, m+time.Month(months), 1, 0, 0, 0, 0, time.UTC)
 	lastDay := firstOfTarget.AddDate(0, 1, -1).Day()
 	return firstOfTarget.AddDate(0, 0, min(d, lastDay)-1)
+}
+
+// permitHoldEnd is the day the MinPermitHoldMonths hold ends, counted from a
+// UTC-midnight issue date.
+func permitHoldEnd(issueDate time.Time) time.Time {
+	return addMonths(issueDate, MinPermitHoldMonths)
 }
 
 func projectedRequirementDate(startDate, today time.Time, current, required float64) (time.Time, bool) {

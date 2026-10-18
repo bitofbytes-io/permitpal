@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -176,6 +177,68 @@ func TestEstimateHoldClampsToMonthEnd(t *testing.T) {
 		profile := Profile{PermitIssueDate: &tt.start, TotalHours: 60, NightHours: 10}
 		if got := estimateText(EstimateReadyDate(profile, tt.start.AddDate(0, 0, 1))); got != tt.want {
 			t.Errorf("issued %s: EstimateReadyDate() = %q, want %q", DateValue(&tt.start), got, tt.want)
+		}
+	}
+}
+
+func TestPermitHoldCountsDownToHoldEnd(t *testing.T) {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Postgres returns dates as UTC midnight.
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		now  time.Time
+		days int
+	}{
+		{"issue date", time.Date(2026, 1, 1, 8, 0, 0, 0, loc), 273},
+		{"late evening counts the local date", time.Date(2026, 9, 29, 23, 30, 0, 0, loc), 2},
+		{"day before hold ends", time.Date(2026, 9, 30, 0, 0, 0, 0, loc), 1},
+		{"hold ends today", time.Date(2026, 10, 1, 0, 0, 0, 0, loc), 0},
+		{"hold over", time.Date(2027, 3, 1, 0, 0, 0, 0, loc), 0},
+	}
+	for _, tt := range tests {
+		hold := NewPermitHold(Profile{PermitIssueDate: &start}, tt.now)
+		if hold.Ends == nil || DateValue(hold.Ends) != "2026-10-01" || hold.DaysLeft != tt.days {
+			t.Errorf("%s: NewPermitHold() = %v, %d days; want 2026-10-01, %d days", tt.name, DisplayDate(hold.Ends), hold.DaysLeft, tt.days)
+		}
+	}
+
+	// The countdown shares the estimate's month-end clamp.
+	mayEnd := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
+	if hold := NewPermitHold(Profile{PermitIssueDate: &mayEnd}, mayEnd); DateValue(hold.Ends) != "2027-02-28" {
+		t.Errorf("May 31 hold ends %s, want 2027-02-28", DateValue(hold.Ends))
+	}
+
+	if hold := NewPermitHold(Profile{}, start); hold != (PermitHold{}) {
+		t.Errorf("no issue date: NewPermitHold() = %+v, want zero", hold)
+	}
+}
+
+func TestRoadTestStepsDateTheRoadTestWhileHoldRuns(t *testing.T) {
+	ends := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name string
+		hold PermitHold
+		want string
+	}{
+		{"hold running", PermitHold{Ends: &ends, DaysLeft: 12}, "The test date must be Oct 1, 2026 or later."},
+		{"hold over", PermitHold{Ends: &ends}, "Book a road test appointment."},
+		{"no issue date", PermitHold{}, "Book a road test appointment."},
+	}
+	for _, tt := range tests {
+		steps := RoadTestSteps(tt.hold)
+		titles := make([]string, len(steps))
+		for i, step := range steps {
+			titles[i] = step.Title
+		}
+		if got := strings.Join(titles, ", "); got != "Be at least 16, 6 months with no violations, Proof of insurance, Schedule the road test" {
+			t.Fatalf("RoadTestSteps() titles = %q", got)
+		}
+		if got := steps[len(steps)-1].Detail; got != tt.want {
+			t.Errorf("%s: road test detail = %q, want %q", tt.name, got, tt.want)
 		}
 	}
 }

@@ -43,6 +43,13 @@ func estimateNote(waitingOn model.ReadyConstraint) string {
 	}
 }
 
+func daysWord(days int) string {
+	if days == 1 {
+		return "day"
+	}
+	return "days"
+}
+
 func odometerChars(value float64) []string {
 	formatted := fmt.Sprintf("%04.1f", value)
 	chars := make([]string, 0, len(formatted))

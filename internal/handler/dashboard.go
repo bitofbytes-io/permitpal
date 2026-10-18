@@ -113,7 +113,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	slog.Info("profile updated", "total_hours", tracker.Profile.TotalHours, "night_hours", tracker.Profile.NightHours, "has_permit_issue_date", tracker.Profile.PermitIssueDate != nil)
-	render(w, r, ui.ProgressPanelWithMessage(h.dashboard(driver, tracker), "Progress saved"))
+	render(w, r, ui.ProfileUpdate(h.dashboard(driver, tracker)))
 }
 
 func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Request) {
