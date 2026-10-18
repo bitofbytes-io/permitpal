@@ -482,6 +482,14 @@ input {
   white-space: nowrap;
 }
 
+.estimate-note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .save-feedback {
   margin: 6px 0 0;
   color: var(--sign-dark);
