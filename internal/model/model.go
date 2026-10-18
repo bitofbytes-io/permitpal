@@ -185,17 +185,18 @@ type RoadTestStep struct {
 }
 
 // RoadTestSteps lists what the driver needs besides hours, skills and the
-// permit hold. The appointment can be booked for the day the hold ends.
+// permit hold. While the hold runs, the road-test step gives the earliest
+// test date without saying when appointments open, which can change.
 func RoadTestSteps(hold PermitHold) []RoadTestStep {
-	appointment := "Schedule your road test at a DMV office."
+	roadTest := "Book a road test appointment."
 	if hold.Ends != nil && hold.DaysLeft > 0 {
-		appointment = "Schedule your road test for " + DisplayDate(hold.Ends) + " or later."
+		roadTest = "The test date must be " + DisplayDate(hold.Ends) + " or later."
 	}
 	return []RoadTestStep{
 		{"Be at least 16", "The minimum age for a Level 2 license."},
 		{"6 months with no violations", "No moving, seat belt, or cell phone convictions."},
 		{"Proof of insurance", "Bring proof of liability insurance to the DMV."},
-		{"Book the DMV appointment", appointment},
+		{"Schedule the road test", roadTest},
 	}
 }
 

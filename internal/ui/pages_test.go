@@ -48,7 +48,7 @@ func TestWhatsLeftCountsDownPermitHold(t *testing.T) {
 		hold model.PermitHold
 		want []string
 	}{
-		{"running", model.PermitHold{Ends: &ends, DaysLeft: 45}, []string{"<strong>45</strong> days to go", "9-month hold ends Dec 2, 2026", "for Dec 2, 2026 or later"}},
+		{"running", model.PermitHold{Ends: &ends, DaysLeft: 45}, []string{"<strong>45</strong> days to go", "9-month hold ends Dec 2, 2026", "must be Dec 2, 2026 or later"}},
 		{"last day", model.PermitHold{Ends: &ends, DaysLeft: 1}, []string{"<strong>1</strong> day to go"}},
 		{"over", model.PermitHold{Ends: &ends}, []string{"Hold complete", "9-month hold ended Dec 2, 2026"}},
 		{"no issue date", model.PermitHold{}, []string{"Add your permit issue date to count down the 9-month hold."}},
@@ -58,7 +58,7 @@ func TestWhatsLeftCountsDownPermitHold(t *testing.T) {
 		if err := WhatsLeft(model.Dashboard{PermitHold: tt.hold}, false).Render(context.Background(), &buf); err != nil {
 			t.Fatal(err)
 		}
-		for _, want := range append(tt.want, "6 months with no violations", "Proof of insurance", "Book the DMV appointment") {
+		for _, want := range append(tt.want, "6 months with no violations", "Proof of insurance", "Schedule the road test") {
 			if !strings.Contains(buf.String(), want) {
 				t.Errorf("%s: card missing %q", tt.name, want)
 			}

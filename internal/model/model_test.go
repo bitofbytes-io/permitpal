@@ -217,16 +217,16 @@ func TestPermitHoldCountsDownToHoldEnd(t *testing.T) {
 	}
 }
 
-func TestRoadTestStepsDateTheAppointmentWhileHoldRuns(t *testing.T) {
+func TestRoadTestStepsDateTheRoadTestWhileHoldRuns(t *testing.T) {
 	ends := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
 		name string
 		hold PermitHold
 		want string
 	}{
-		{"hold running", PermitHold{Ends: &ends, DaysLeft: 12}, "Schedule your road test for Oct 1, 2026 or later."},
-		{"hold over", PermitHold{Ends: &ends}, "Schedule your road test at a DMV office."},
-		{"no issue date", PermitHold{}, "Schedule your road test at a DMV office."},
+		{"hold running", PermitHold{Ends: &ends, DaysLeft: 12}, "The test date must be Oct 1, 2026 or later."},
+		{"hold over", PermitHold{Ends: &ends}, "Book a road test appointment."},
+		{"no issue date", PermitHold{}, "Book a road test appointment."},
 	}
 	for _, tt := range tests {
 		steps := RoadTestSteps(tt.hold)
@@ -234,11 +234,11 @@ func TestRoadTestStepsDateTheAppointmentWhileHoldRuns(t *testing.T) {
 		for i, step := range steps {
 			titles[i] = step.Title
 		}
-		if got := strings.Join(titles, ", "); got != "Be at least 16, 6 months with no violations, Proof of insurance, Book the DMV appointment" {
+		if got := strings.Join(titles, ", "); got != "Be at least 16, 6 months with no violations, Proof of insurance, Schedule the road test" {
 			t.Fatalf("RoadTestSteps() titles = %q", got)
 		}
 		if got := steps[len(steps)-1].Detail; got != tt.want {
-			t.Errorf("%s: appointment detail = %q, want %q", tt.name, got, tt.want)
+			t.Errorf("%s: road test detail = %q, want %q", tt.name, got, tt.want)
 		}
 	}
 }
