@@ -11,6 +11,9 @@ import (
 const (
 	TotalHoursRequired = 60.0
 	NightHoursRequired = 10.0
+	// MinPermitHoldMonths is how long the permit must be held before the
+	// road test, counted from the issue date.
+	MinPermitHoldMonths = 9
 )
 
 type RequirementRating string
@@ -104,11 +107,22 @@ func Percent(value, target float64) int {
 	return int(math.Max(0, math.Min(99, math.Floor(value/target*100))))
 }
 
-// ReadyEstimate is the projected date the hour requirements will be met, or,
+// ReadyConstraint names the requirement that sets a ready estimate's date.
+type ReadyConstraint string
+
+const (
+	ConstraintTotalHours ReadyConstraint = "total_hours"
+	ConstraintNightHours ReadyConstraint = "night_hours"
+	ConstraintPermitHold ReadyConstraint = "permit_hold"
+)
+
+// ReadyEstimate is the projected date the hour requirements will be met and
+// the permit hold will have passed, with the constraint that sets it, or,
 // when there is none, a hint about what the driver should do next.
 type ReadyEstimate struct {
-	Date *time.Time
-	Hint string
+	Date      *time.Time
+	WaitingOn ReadyConstraint
+	Hint      string
 }
 
 func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
@@ -130,13 +144,19 @@ func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	if !ok {
 		return ReadyEstimate{Hint: "Add night hours to estimate"}
 	}
+	waitingOn := ConstraintTotalHours
 	if nightDate.After(readyDate) {
-		readyDate = nightDate
+		readyDate, waitingOn = nightDate, ConstraintNightHours
+	}
+	// AddDate normalizes month-end overflow (May 31 + 9 months is March 2 or
+	// 3), which errs toward the later date the DMV will accept.
+	if holdEnd := startDate.AddDate(0, MinPermitHoldMonths, 0); holdEnd.After(readyDate) {
+		readyDate, waitingOn = holdEnd, ConstraintPermitHold
 	}
 	if !readyDate.After(today) {
 		return ReadyEstimate{Hint: "Ready when every skill is rated Good"}
 	}
-	return ReadyEstimate{Date: &readyDate}
+	return ReadyEstimate{Date: &readyDate, WaitingOn: waitingOn}
 }
 
 func FormatHours(hours float64) string {

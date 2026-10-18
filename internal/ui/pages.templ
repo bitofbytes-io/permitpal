@@ -215,12 +215,15 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 			<div class="estimate-face">
 				<div class="calendar-icon" aria-hidden="true"></div>
 				if date := dashboard.ReadyEstimate.Date; date != nil {
-					<span>On pace for</span>
+					<span>{ estimateLabel(dashboard.ReadyEstimate.WaitingOn) }</span>
 					<strong class="estimate-date">{ date.Format("January 2, 2006") }</strong>
 				} else {
 					<strong>{ dashboard.ReadyEstimate.Hint }</strong>
 				}
 			</div>
+			if note := estimateNote(dashboard.ReadyEstimate.WaitingOn); note != "" {
+				<p class="estimate-note">{ note }</p>
+			}
 			if savedMessage != "" {
 				<p class="save-feedback" role="status">{ savedMessage }</p>
 			}

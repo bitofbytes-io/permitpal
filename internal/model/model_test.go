@@ -69,8 +69,9 @@ func TestEstimateUsesLocalDateLateInTheEvening(t *testing.T) {
 	// Postgres returns dates as UTC midnight; 23:30 in New York is already the next day in UTC.
 	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	now := time.Date(2026, 9, 26, 23, 30, 0, 0, loc)
-	profile := Profile{PermitIssueDate: &start, TotalHours: 25, NightHours: 10}
-	if got := estimateText(EstimateReadyDate(profile, now)); got != "On pace for October 31, 2026" {
+	// Slow enough that the pace, not the permit hold, sets the date.
+	profile := Profile{PermitIssueDate: &start, TotalHours: 2, NightHours: 10}
+	if got := estimateText(EstimateReadyDate(profile, now)); got != "On pace for September 20, 2028" {
 		t.Fatalf("EstimateReadyDate() = %q, want pace from 25 elapsed days", got)
 	}
 }
@@ -109,11 +110,12 @@ func TestNewDriverDefaultsAndFocus(t *testing.T) {
 	}
 }
 func TestEstimateUsesLaterNightProjection(t *testing.T) {
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	now := start.AddDate(0, 0, 30)
+	start := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start.AddDate(0, 0, 300)
 	profile := Profile{PermitIssueDate: &start, TotalHours: 30, NightHours: 2}
-	if got := estimateText(EstimateReadyDate(profile, now)); got != "On pace for May 31, 2026" {
-		t.Fatal(got)
+	estimate := EstimateReadyDate(profile, now)
+	if got := estimateText(estimate); got != "On pace for February 9, 2029" || estimate.WaitingOn != ConstraintNightHours {
+		t.Fatalf("EstimateReadyDate() = %q waiting on %q", got, estimate.WaitingOn)
 	}
 	profile.TotalHours = 60
 	profile.NightHours = 10
@@ -122,10 +124,59 @@ func TestEstimateUsesLaterNightProjection(t *testing.T) {
 	}
 }
 
+func TestEstimateWaitsOnTotalHoursWhenSlowest(t *testing.T) {
+	issueDate := time.Date(2025, 7, 24, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	profile := Profile{PermitIssueDate: &issueDate, TotalHours: 34.5, NightHours: 6}
+	if estimate := EstimateReadyDate(profile, now); estimate.WaitingOn != ConstraintTotalHours {
+		t.Fatalf("WaitingOn = %q, want %q", estimate.WaitingOn, ConstraintTotalHours)
+	}
+}
+
+func TestEstimateHoldsUntilNineMonthsAfterIssue(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name         string
+		now          time.Time
+		total, night float64
+		want         string
+	}{
+		{"pace ahead of hold", time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), 40, 10, "Eligible on October 1, 2026"},
+		{"hours complete before hold", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
+		{"day before hold ends", time.Date(2026, 9, 30, 23, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
+		{"hold ends today", time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), 60, 10, "Ready when every skill is rated Good"},
+	}
+	for _, tt := range tests {
+		profile := Profile{PermitIssueDate: &start, TotalHours: tt.total, NightHours: tt.night}
+		estimate := EstimateReadyDate(profile, tt.now)
+		if got := estimateText(estimate); got != tt.want {
+			t.Errorf("%s: EstimateReadyDate() = %q, want %q", tt.name, got, tt.want)
+		}
+		if estimate.Date != nil && estimate.WaitingOn != ConstraintPermitHold {
+			t.Errorf("%s: WaitingOn = %q, want %q", tt.name, estimate.WaitingOn, ConstraintPermitHold)
+		}
+	}
+}
+
+func TestEstimateHoldRollsMonthEndForward(t *testing.T) {
+	// February 2027 has no 31st, so the hold ends on the first day that is
+	// at least nine months on.
+	start := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	profile := Profile{PermitIssueDate: &start, TotalHours: 60, NightHours: 10}
+	if got := estimateText(EstimateReadyDate(profile, now)); got != "Eligible on March 3, 2027" {
+		t.Fatal(got)
+	}
+}
+
 // estimateText renders an estimate the way the dashboard shows it.
 func estimateText(estimate ReadyEstimate) string {
 	if estimate.Date != nil {
-		return "On pace for " + estimate.Date.Format("January 2, 2006")
+		label := "On pace for "
+		if estimate.WaitingOn == ConstraintPermitHold {
+			label = "Eligible on "
+		}
+		return label + estimate.Date.Format("January 2, 2006")
 	}
 	return estimate.Hint
 }
