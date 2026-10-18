@@ -141,6 +141,8 @@ func TestEstimateHoldsUntilNineMonthsAfterIssue(t *testing.T) {
 		total, night float64
 		want         string
 	}{
+		{"hours complete on issue date", time.Date(2026, 1, 1, 20, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
+		{"hours started on issue date", time.Date(2026, 1, 1, 20, 0, 0, 0, time.UTC), 60, 4, "Add hours to estimate"},
 		{"pace ahead of hold", time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC), 40, 10, "Eligible on October 1, 2026"},
 		{"hours complete before hold", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
 		{"day before hold ends", time.Date(2026, 9, 30, 23, 0, 0, 0, time.UTC), 60, 10, "Eligible on October 1, 2026"},
@@ -158,14 +160,23 @@ func TestEstimateHoldsUntilNineMonthsAfterIssue(t *testing.T) {
 	}
 }
 
-func TestEstimateHoldRollsMonthEndForward(t *testing.T) {
-	// February 2027 has no 31st, so the hold ends on the first day that is
-	// at least nine months on.
-	start := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
-	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	profile := Profile{PermitIssueDate: &start, TotalHours: 60, NightHours: 10}
-	if got := estimateText(EstimateReadyDate(profile, now)); got != "Eligible on March 3, 2027" {
-		t.Fatal(got)
+func TestEstimateHoldClampsToMonthEnd(t *testing.T) {
+	tests := []struct {
+		start time.Time
+		want  string
+	}{
+		// February 2027 has no 31st, so the hold ends on its last day.
+		{time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC), "Eligible on February 28, 2027"},
+		{time.Date(2027, 5, 31, 0, 0, 0, 0, time.UTC), "Eligible on February 29, 2028"},
+		{time.Date(2026, 7, 31, 0, 0, 0, 0, time.UTC), "Eligible on April 30, 2027"},
+		{time.Date(2026, 5, 30, 0, 0, 0, 0, time.UTC), "Eligible on February 28, 2027"},
+		{time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC), "Eligible on February 15, 2027"},
+	}
+	for _, tt := range tests {
+		profile := Profile{PermitIssueDate: &tt.start, TotalHours: 60, NightHours: 10}
+		if got := estimateText(EstimateReadyDate(profile, tt.start.AddDate(0, 0, 1))); got != tt.want {
+			t.Errorf("issued %s: EstimateReadyDate() = %q, want %q", DateValue(&tt.start), got, tt.want)
+		}
 	}
 }
 

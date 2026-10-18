@@ -131,7 +131,10 @@ func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	}
 	startDate := startOfDay(*profile.PermitIssueDate)
 	today := startOfDay(now)
-	if !today.After(startDate) {
+	// No days have passed to set a pace, but completed hours need none: the
+	// permit hold alone then sets the date.
+	hoursComplete := profile.TotalHours >= TotalHoursRequired && profile.NightHours >= NightHoursRequired
+	if !today.After(startDate) && !hoursComplete {
 		return ReadyEstimate{Hint: "Add hours to estimate"}
 	}
 
@@ -148,9 +151,7 @@ func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	if nightDate.After(readyDate) {
 		readyDate, waitingOn = nightDate, ConstraintNightHours
 	}
-	// AddDate normalizes month-end overflow (May 31 + 9 months is March 2 or
-	// 3), which errs toward the later date the DMV will accept.
-	if holdEnd := startDate.AddDate(0, MinPermitHoldMonths, 0); holdEnd.After(readyDate) {
+	if holdEnd := addMonths(startDate, MinPermitHoldMonths); holdEnd.After(readyDate) {
 		readyDate, waitingOn = holdEnd, ConstraintPermitHold
 	}
 	if !readyDate.After(today) {
@@ -244,6 +245,17 @@ func DisplayDate(date *time.Time) string {
 func startOfDay(t time.Time) time.Time {
 	y, m, d := t.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+// addMonths moves a UTC-midnight date forward by calendar months, clamping
+// to the target month's last day when it is shorter (May 31 + 9 months is
+// February 28) the way calendar months are usually counted. time.AddDate
+// would roll over into March instead.
+func addMonths(date time.Time, months int) time.Time {
+	y, m, d := date.Date()
+	firstOfTarget := time.Date(y, m+time.Month(months), 1, 0, 0, 0, 0, time.UTC)
+	lastDay := firstOfTarget.AddDate(0, 1, -1).Day()
+	return firstOfTarget.AddDate(0, 0, min(d, lastDay)-1)
 }
 
 func projectedRequirementDate(startDate, today time.Time, current, required float64) (time.Time, bool) {
