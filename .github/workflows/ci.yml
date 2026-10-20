@@ -46,6 +46,24 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           "$(go env GOPATH)/bin/govulncheck" ./...
       - run: make build
+      - name: Set up Node for browser tests
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: test-support/browser/package-lock.json
+      - name: Install browser test dependencies
+        run: |
+          npm ci --prefix test-support/browser
+          test-support/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Test dashboard feedback in Chromium with both stores
+        env:
+          PERMITPAL_PLAYWRIGHT_MODULE: ${{ github.workspace }}/test-support/browser/node_modules/playwright
+        run: |
+          : "${PERMITPAL_PLAYWRIGHT_MODULE:?Missing Playwright module path}"
+          : "${PERMITPAL_TEST_DATABASE_URL:?Missing disposable Postgres test database}"
+          node -e 'require(process.env.PERMITPAL_PLAYWRIGHT_MODULE)'
+          go test -race -count=1 -v ./internal/server -run '^TestDashboardSaveFeedbackInBrowser$'
 
   build-and-trigger:
     needs: test

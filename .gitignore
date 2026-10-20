@@ -4,3 +4,4 @@ permitpal.env
 .DS_Store
 tmp/
 output/
+node_modules/
