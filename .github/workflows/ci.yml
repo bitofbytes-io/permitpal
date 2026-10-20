@@ -35,7 +35,7 @@ jobs:
       - name: Check generated templ output
         run: make check-generated
       - run: make test
-      - run: go test -race ./internal/handler ./internal/model ./internal/repository
+      - run: go test -race ./...
       - run: go vet ./...
       - name: Check Go vulnerabilities
         # Install, then run it with the go.mod toolchain so standard-library findings match
