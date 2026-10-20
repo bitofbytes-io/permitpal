@@ -146,10 +146,14 @@ Migration 003 can be reversed on a scratch database with `make migrate-down` the
 ## Verification
 
 ```bash
+make check-generated
+make lint
 make test
 PERMITPAL_TEST_DATABASE_URL='postgres://user:password@localhost/permitpal_test?sslmode=disable' go test -race ./internal/...
 go vet ./...
 make build
 ```
+
+`make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs staticcheck. Staticcheck is pinned as a Go tool dependency in `go.mod`, so no global installation is needed and Renovate can track its version. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
 
 Database tests use isolated temporary schemas and verify migration 003 up/down/up. Use only a disposable database for the test URL. For two-account browser checks, set `PERMITPAL_USERS_FILE` and `SESSION_SECRET` in `local.mk`, then run `make dev`. Sign in as each driver, save hours and a rating, and confirm that the other driver's tracker is unchanged.
