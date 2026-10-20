@@ -22,7 +22,7 @@ help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-20s %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
 
 templ: ## Generate Go code from templ files
-	go run github.com/a-h/templ/cmd/templ@$$(go list -m -f '{{.Version}}' github.com/a-h/templ) generate
+	go tool templ generate
 
 check-generated: templ ## Verify committed templ output is up to date
 	@git diff --exit-code -- '*_templ.go' || { echo "Generated templ output is stale. Run make templ and commit the generated files." >&2; exit 1; }

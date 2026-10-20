@@ -1,17 +1,13 @@
 # syntax=docker/dockerfile:1
 
 FROM golang:1.26.9-alpine3.23 AS builder
-ARG TEMPL_VERSION=v0.3.1001
 WORKDIR /src
-
-RUN apk add --no-cache curl
-RUN go install github.com/a-h/templ/cmd/templ@${TEMPL_VERSION}
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN templ generate
+RUN go tool templ generate
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/permitpal ./cmd/permitpal
 
 FROM alpine:3.23
