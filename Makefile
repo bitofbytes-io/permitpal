@@ -16,13 +16,22 @@ PLATFORMS ?= linux/amd64,linux/arm64/v8
 
 -include local.mk
 
-.PHONY: help templ dev run run-postgres build test migrate migrate-down migrate-status docker-build docker-buildx clean
+.PHONY: help templ check-generated dev run run-postgres build test migrate migrate-down migrate-status docker-build docker-buildx clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-20s %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
 
 templ: ## Generate Go code from templ files
 	go run github.com/a-h/templ/cmd/templ@$$(go list -m -f '{{.Version}}' github.com/a-h/templ) generate
+
+check-generated: templ ## Verify committed templ output is up to date
+	@git diff --exit-code -- '*_templ.go' || { echo "Generated templ output is stale. Run make templ and commit the generated files." >&2; exit 1; }
+	@untracked="$$(git ls-files --others --exclude-standard -- '*_templ.go')" || exit 1; \
+	if [ -n "$$untracked" ]; then \
+		echo "Untracked generated templ output. Add and commit these files:" >&2; \
+		printf '%s\n' "$$untracked" >&2; \
+		exit 1; \
+	fi
 
 dev: templ ## Run local visual preview with memory storage and no database
 	@test -n "$$PERMITPAL_USERS$$PERMITPAL_USERS_FILE" || (echo "PERMITPAL_USERS_FILE or PERMITPAL_USERS must be set in local.mk or the environment" >&2; exit 1)
