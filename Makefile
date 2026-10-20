@@ -16,7 +16,7 @@ PLATFORMS ?= linux/amd64,linux/arm64/v8
 
 -include local.mk
 
-.PHONY: help templ check-generated dev run run-postgres build test migrate migrate-down migrate-status docker-build docker-buildx clean
+.PHONY: help templ check-generated lint dev run run-postgres build test migrate migrate-down migrate-status docker-build docker-buildx clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-20s %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
@@ -32,6 +32,15 @@ check-generated: templ ## Verify committed templ output is up to date
 		printf '%s\n' "$$untracked" >&2; \
 		exit 1; \
 	fi
+
+lint: templ ## Check Go formatting and run staticcheck
+	@unformatted="$$(gofmt -l .)" || exit 1; \
+	if [ -n "$$unformatted" ]; then \
+		echo "Go files need formatting. Run gofmt -w on the listed files:" >&2; \
+		printf '%s\n' "$$unformatted" >&2; \
+		exit 1; \
+	fi
+	go tool staticcheck ./...
 
 dev: templ ## Run local visual preview with memory storage and no database
 	@test -n "$$PERMITPAL_USERS$$PERMITPAL_USERS_FILE" || (echo "PERMITPAL_USERS_FILE or PERMITPAL_USERS must be set in local.mk or the environment" >&2; exit 1)
