@@ -2,6 +2,8 @@
 
 PermitPal is a self-hosted Go dashboard for tracking progress toward the North Carolina Level 2 road test. Each driver has a separate login and tracker for the Level 1 to Level 2 requirement of 60 total driving hours, including 10 night hours. It supports an ephemeral in-memory preview and persistent PostgreSQL deployments.
 
+Ready estimates project the pace of manually entered total and night hours since the permit issue date, with a 9-month permit-hold floor. PermitPal stores aggregate hours, not dated drives, so it does not calculate the 10-hour weekly credit cap. [BOB-177](https://linear.app/drywaters/issue/BOB-177) tracks applying that cap once dated per-drive logging exists, including the limiting-factor UI and month-end/week-boundary tests. The `WeeklyHourCap` constant records the pending rule; the current estimate does not verify weekly eligibility.
+
 ## Requirements
 
 - Docker 24+

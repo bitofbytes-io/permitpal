@@ -14,6 +14,16 @@ const (
 	// MinPermitHoldMonths is how long the permit must be held before the
 	// road test, counted from the issue date.
 	MinPermitHoldMonths = 9
+	// WeeklyHourCap is the maximum credited driving hours per calendar week.
+	// TODO(BOB-177): apply this cap once dated per-drive logging exists;
+	// aggregate profile hours cannot establish weekly credited totals.
+	WeeklyHourCap = 10
+)
+
+// North Carolina jurisdiction copy used by the road-test checklist.
+const (
+	level2LicenseAgeDetail = "The minimum age for a Level 2 license."
+	dmvInsuranceDetail     = "Bring proof of liability insurance to the DMV."
 )
 
 type RequirementRating string
@@ -126,6 +136,8 @@ type ReadyEstimate struct {
 	Hint      string
 }
 
+// EstimateReadyDate projects manually entered aggregate hours and applies the
+// permit-hold floor. It does not calculate weekly credited hours.
 func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	if profile.PermitIssueDate == nil {
 		return ReadyEstimate{Hint: "Add permit issue date to estimate"}
@@ -193,9 +205,9 @@ func RoadTestSteps(hold PermitHold) []RoadTestStep {
 		roadTest = "The test date must be " + DisplayDate(hold.Ends) + " or later."
 	}
 	return []RoadTestStep{
-		{"Be at least 16", "The minimum age for a Level 2 license."},
+		{"Be at least 16", level2LicenseAgeDetail},
 		{"6 months with no violations", "No moving, seat belt, or cell phone convictions."},
-		{"Proof of insurance", "Bring proof of liability insurance to the DMV."},
+		{"Proof of insurance", dmvInsuranceDetail},
 		{"Schedule the road test", roadTest},
 	}
 }
