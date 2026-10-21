@@ -247,3 +247,79 @@ func TestHourEntryMigrationRollbackKeepsCumulativeTotals(t *testing.T) {
 		t.Fatalf("reinstalled history invented dates: %+v", c)
 	}
 }
+
+func TestProfileHoursRejectUnsupportedPrecision(t *testing.T) {
+	for _, backend := range []string{"memory", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			var store Store = NewMemoryStore(time.Now())
+			if backend == "postgres" {
+				pool := testSchemaPool(t)
+				migrate(t, pool, 1, SchemaVersion)
+				store = NewPostgresStore(pool)
+			}
+			ctx := context.Background()
+			at := time.Date(2026, 10, 21, 12, 0, 0, 0, time.UTC)
+			driver, err := store.EnsureDriver(ctx, "precision-driver", at)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before, err := store.GetTracker(ctx, driver.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, profile := range []model.Profile{
+				{TotalHours: 0.01},
+				{TotalHours: 1.01, NightHours: 0.1},
+				{TotalHours: 1, NightHours: 0.01},
+				{TotalHours: 1, NightHours: 0.15},
+				{TotalHours: math.Nextafter(0.1, 1)},
+				{TotalHours: model.MaxRecordedHours, NightHours: 999.99},
+			} {
+				if _, err := store.UpdateProfile(ctx, driver.ID, profile, at); err == nil {
+					t.Fatalf("unsupported precision accepted: %+v", profile)
+				}
+				after, err := store.GetTracker(ctx, driver.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(before, after) {
+					t.Fatalf("unsupported precision changed tracker: %+v", after)
+				}
+			}
+			saved, err := store.UpdateProfile(ctx, driver.ID, model.Profile{TotalHours: 0.1, NightHours: 0.1}, at)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if saved.TotalHours != 0.1 || saved.NightHours != 0.1 || len(saved.HourEntries) != 1 || saved.HourEntries[0].TotalTenths != 1 || saved.HourEntries[0].NightTenths != 1 {
+				t.Fatalf("valid tenth did not persist: %+v", saved)
+			}
+			after, err := store.GetTracker(ctx, driver.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after.Profile.TotalHours != 0.1 || after.Profile.NightHours != 0.1 || len(after.Profile.HourEntries) != 1 {
+				t.Fatalf("valid tenth not stored: %+v", after.Profile)
+			}
+			if _, err := store.UpdateProfile(ctx, driver.ID, model.Profile{TotalHours: 0.11, NightHours: 0.1}, at); err == nil {
+				t.Fatal("unsupported precision accepted after valid save")
+			}
+			unchanged, err := store.GetTracker(ctx, driver.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(after, unchanged) {
+				t.Fatal("rejected precision changed existing valid progress")
+			}
+
+		})
+	}
+}
+
+func TestProfileHoursAcceptEverySupportedTenth(t *testing.T) {
+	for tenths := 0; tenths <= model.MaxRecordedHours*10; tenths++ {
+		hours := float64(tenths) / 10
+		if err := validateProfileHours(model.Profile{TotalHours: hours, NightHours: hours}); err != nil {
+			t.Fatalf("valid hours %v rejected: %v", hours, err)
+		}
+	}
+}

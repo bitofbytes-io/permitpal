@@ -56,6 +56,12 @@ func validateProfileHours(profile model.Profile) error {
 		if math.IsNaN(hours) || math.IsInf(hours, 0) || hours < 0 || hours > model.MaxRecordedHours {
 			return fmt.Errorf("recorded hours must be finite and between 0 and %d", model.MaxRecordedHours)
 		}
+		// Compare in hours after rounding to tenths, so ordinary decimal
+		// float representations (such as 0.1) remain valid. Never silently
+		// round direct Store callers differently from the HTTP form.
+		if hours != math.Round(hours*10)/10 {
+			return fmt.Errorf("recorded hours must have at most one decimal place")
+		}
 	}
 	if profile.NightHours > profile.TotalHours {
 		return fmt.Errorf("night hours cannot exceed total hours")
