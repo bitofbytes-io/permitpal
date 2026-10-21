@@ -11,12 +11,15 @@ import (
 const (
 	TotalHoursRequired = 60.0
 	NightHoursRequired = 10.0
+	// MaxRecordedHours bounds cumulative input independently of credited
+	// requirements, leaving room to replace hours excluded by a weekly cap.
+	// 1,000 hours fits numeric(5,1) and integer-tenths journal arithmetic.
+	MaxRecordedHours = 1000
 	// MinPermitHoldMonths is how long the permit must be held before the
 	// road test, counted from the issue date.
 	MinPermitHoldMonths = 9
 	// WeeklyHourCap is the maximum credited driving hours per calendar week.
-	// TODO(BOB-177): apply this cap once dated per-drive logging exists;
-	// aggregate profile hours cannot establish weekly credited totals.
+	// Applied to increments grouped by their recorded ISO calendar week.
 	WeeklyHourCap = 10
 )
 
@@ -57,6 +60,7 @@ type Profile struct {
 	TotalHours      float64
 	NightHours      float64
 	UpdatedAt       time.Time
+	HourEntries     []HourEntry
 }
 
 type Requirement struct {
@@ -86,6 +90,7 @@ type Dashboard struct {
 	TotalPercent  int
 	NightPercent  int
 	GoodCount     int
+	HourCredit    HourCredit
 }
 
 func NewDashboard(driver Driver, profile Profile, requirements []Requirement, now time.Time) Dashboard {
@@ -105,7 +110,7 @@ func NewDashboard(driver Driver, profile Profile, requirements []Requirement, no
 			}
 		}
 	}
-	return Dashboard{Driver: driver, Profile: profile, Requirements: ordered, PracticeFocus: focus, ReadyEstimate: EstimateReadyDate(profile, now), PermitHold: NewPermitHold(profile, now), TotalPercent: Percent(profile.TotalHours, TotalHoursRequired), NightPercent: Percent(profile.NightHours, NightHoursRequired), GoodCount: good}
+	return Dashboard{Driver: driver, Profile: profile, Requirements: ordered, PracticeFocus: focus, ReadyEstimate: EstimateReadyDate(profile, now), PermitHold: NewPermitHold(profile, now), TotalPercent: Percent(profile.TotalHours, TotalHoursRequired), NightPercent: Percent(profile.NightHours, NightHoursRequired), GoodCount: good, HourCredit: CreditHours(profile)}
 }
 
 func Percent(value, target float64) int {
@@ -125,6 +130,7 @@ const (
 	ConstraintTotalHours ReadyConstraint = "total_hours"
 	ConstraintNightHours ReadyConstraint = "night_hours"
 	ConstraintPermitHold ReadyConstraint = "permit_hold"
+	ConstraintWeeklyCap  ReadyConstraint = "weekly_cap"
 )
 
 // ReadyEstimate is the projected date the hour requirements will be met and
@@ -136,35 +142,38 @@ type ReadyEstimate struct {
 	Hint      string
 }
 
-// EstimateReadyDate projects manually entered aggregate hours and applies the
-// permit-hold floor. It does not calculate weekly credited hours.
+// EstimateReadyDate uses the observed cumulative pace and entry-week credit,
+// then applies the permit-hold floor. Entry dates do not verify drive dates.
 func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
 	if profile.PermitIssueDate == nil {
 		return ReadyEstimate{Hint: "Add permit issue date to estimate"}
 	}
-	startDate := startOfDay(*profile.PermitIssueDate)
-	today := startOfDay(now)
-	// No days have passed to set a pace, but completed hours need none: the
-	// permit hold alone then sets the date.
-	hoursComplete := profile.TotalHours >= TotalHoursRequired && profile.NightHours >= NightHoursRequired
-	if !today.After(startDate) && !hoursComplete {
-		return ReadyEstimate{Hint: "Add hours to estimate"}
-	}
-
-	readyDate, ok := projectedRequirementDate(startDate, today, profile.TotalHours, TotalHoursRequired)
-	if !ok {
-		return ReadyEstimate{Hint: "Add hours to estimate"}
-	}
-
-	nightDate, ok := projectedRequirementDate(startDate, today, profile.NightHours, NightHoursRequired)
-	if !ok {
-		return ReadyEstimate{Hint: "Add night hours to estimate"}
-	}
+	start, today := startOfDay(*profile.PermitIssueDate), startOfDay(now)
+	credit := CreditHours(profile)
+	readyDate := today
 	waitingOn := ConstraintTotalHours
-	if nightDate.After(readyDate) {
-		readyDate, waitingOn = nightDate, ConstraintNightHours
+	if credit.TotalHours < TotalHoursRequired || credit.NightHours < NightHoursRequired {
+		elapsed := today.Sub(start).Hours() / 24
+		if elapsed <= 0 || profile.TotalHours <= 0 {
+			return ReadyEstimate{Hint: "Add hours to estimate"}
+		}
+		if profile.NightHours <= 0 {
+			return ReadyEstimate{Hint: "Add night hours to estimate"}
+		}
+		totalPace, nightPace := profile.TotalHours/elapsed, profile.NightHours/elapsed
+		totalDays := projectedCreditDays(credit, today, totalPace, nightPace, TotalHoursRequired, 0)
+		nightDays := projectedCreditDays(credit, today, totalPace, nightPace, 0, NightHoursRequired)
+		days := max(totalDays, nightDays)
+		if nightDays > totalDays {
+			waitingOn = ConstraintNightHours
+		}
+		uncappedDays := max(0, int(math.Ceil((TotalHoursRequired-profile.TotalHours)/totalPace)), int(math.Ceil((NightHoursRequired-profile.NightHours)/nightPace)))
+		if days > uncappedDays {
+			waitingOn = ConstraintWeeklyCap
+		}
+		readyDate = today.AddDate(0, 0, days)
 	}
-	if holdEnd := permitHoldEnd(startDate); holdEnd.After(readyDate) {
+	if holdEnd := permitHoldEnd(start); holdEnd.After(readyDate) {
 		readyDate, waitingOn = holdEnd, ConstraintPermitHold
 	}
 	if !readyDate.After(today) {
@@ -314,19 +323,4 @@ func addMonths(date time.Time, months int) time.Time {
 // UTC-midnight issue date.
 func permitHoldEnd(issueDate time.Time) time.Time {
 	return addMonths(issueDate, MinPermitHoldMonths)
-}
-
-func projectedRequirementDate(startDate, today time.Time, current, required float64) (time.Time, bool) {
-	if current >= required {
-		return today, true
-	}
-	if current <= 0 {
-		return time.Time{}, false
-	}
-	elapsedDays := today.Sub(startDate).Hours() / 24
-	if elapsedDays <= 0 {
-		return time.Time{}, false
-	}
-	daysToRequired := int(math.Ceil(required / current * elapsedDays))
-	return startDate.AddDate(0, 0, daysToRequired), true
 }

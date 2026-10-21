@@ -6,6 +6,9 @@ import (
 	"github.com/drywaters/permitpal/internal/model"
 )
 
+// recordedHoursPattern matches the 1,000-hour cumulative input ceiling.
+const recordedHoursPattern = `(1000(\.0)?|[0-9]{1,3}(\.[0-9])?|\.[0-9])`
+
 func progressStyle(percent int) string {
 	return fmt.Sprintf("--progress:%d%%", percent)
 }
@@ -34,6 +37,8 @@ func estimateNote(waitingOn model.ReadyConstraint) string {
 	switch waitingOn {
 	case model.ConstraintPermitHold:
 		return fmt.Sprintf("Waiting on %d-month hold", model.MinPermitHoldMonths)
+	case model.ConstraintWeeklyCap:
+		return fmt.Sprintf("Waiting on %d-hour weekly cap", model.WeeklyHourCap)
 	case model.ConstraintNightHours:
 		return "Waiting on night hours"
 	case model.ConstraintTotalHours:

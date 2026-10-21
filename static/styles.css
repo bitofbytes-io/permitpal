@@ -297,6 +297,25 @@ input {
   background: rgba(255, 253, 247, 0.85);
 }
 
+.hour-credit {
+  grid-column: 1 / -1;
+  padding-top: 10px;
+  border-top: 1px solid #d1c5af;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.hour-credit p {
+  margin: 4px 0;
+}
+
+.entry-note {
+  margin: 4px 0;
+  color: #535b50;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .metric {
   padding: 0 26px 0 0;
   border-right: 1px solid #d1c5af;

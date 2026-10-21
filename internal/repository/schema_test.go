@@ -148,7 +148,7 @@ func TestNightHoursConstraintMigration(t *testing.T) {
 		return validated
 	}
 	saveHours := func(pool *pgxpool.Pool, driverID int64, total, night float64) error {
-		_, err := NewPostgresStore(pool).UpdateProfile(ctx, driverID, model.Profile{TotalHours: total, NightHours: night})
+		_, err := pool.Exec(ctx, `insert into app_profile (driver_id,total_hours,night_hours) values ($1,$2,$3) on conflict (driver_id) do update set total_hours=excluded.total_hours,night_hours=excluded.night_hours`, driverID, total, night)
 		return err
 	}
 
@@ -215,8 +215,8 @@ func TestUnusedSeedIsRemovedFromNewInstalls(t *testing.T) {
 		if err != nil {
 			return 0, err
 		}
-		tracker, err := store.GetTracker(ctx, driver.ID)
-		return len(tracker.Requirements), err
+		requirements, err := store.getRequirements(ctx, driver.ID)
+		return len(requirements), err
 	}
 
 	t.Run("new install", func(t *testing.T) {

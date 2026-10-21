@@ -70,8 +70,8 @@ func TestAuthenticatedDashboardAndHTMXUpdates(t *testing.T) {
 	if !strings.Contains(body, "Road Test Skill Checklist") || !strings.Contains(body, "Use of lane") {
 		t.Fatalf("dashboard missing checklist content: %s", body)
 	}
-	assertDecimalHourInput(t, body, "total_hours", `(60(\.0)?|[0-5]?[0-9](\.[0-9])?|\.[0-9])`)
-	assertDecimalHourInput(t, body, "night_hours", `(10(\.0)?|[0-9](\.[0-9])?|\.[0-9])`)
+	assertDecimalHourInput(t, body, "total_hours", `(1000(\.0)?|[0-9]{1,3}(\.[0-9])?|\.[0-9])`)
+	assertDecimalHourInput(t, body, "night_hours", `(1000(\.0)?|[0-9]{1,3}(\.[0-9])?|\.[0-9])`)
 
 	update := url.Values{
 		"rating":   {"good"},
@@ -122,7 +122,7 @@ func newTestApp(t *testing.T) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.UpdateProfile(context.Background(), caleb.ID, model.Profile{TotalHours: 56, NightHours: 8}); err != nil {
+	if _, err := store.UpdateProfile(context.Background(), caleb.ID, model.Profile{TotalHours: 56, NightHours: 8}, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	return New(cfg, store, slog.Default())

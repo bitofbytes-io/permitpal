@@ -18,6 +18,7 @@ func TestProgressPanelNamesReadyConstraint(t *testing.T) {
 	}{
 		{model.ReadyEstimate{Date: &date, WaitingOn: model.ConstraintPermitHold}, []string{"Hold ends", "October 1, 2026", "Waiting on 9-month hold"}},
 		{model.ReadyEstimate{Date: &date, WaitingOn: model.ConstraintNightHours}, []string{"On pace for", "Waiting on night hours"}},
+		{model.ReadyEstimate{Date: &date, WaitingOn: model.ConstraintWeeklyCap}, []string{"Waiting on 10-hour weekly cap"}},
 		{model.ReadyEstimate{Date: &date, WaitingOn: model.ConstraintTotalHours}, []string{"On pace for", "Waiting on total hours"}},
 	}
 	for _, tt := range tests {

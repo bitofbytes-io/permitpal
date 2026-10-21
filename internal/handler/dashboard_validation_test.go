@@ -122,7 +122,7 @@ func TestDashboardValidation(t *testing.T) {
 				}
 			})
 			for _, field := range []string{"total_hours", "night_hours"} {
-				for _, value := range []string{"NaN", "Inf", "+Inf", "-Inf", "Infinity", "1.23", "-1", "61"} {
+				for _, value := range []string{"NaN", "Inf", "+Inf", "-Inf", "Infinity", "1.23", "-1", "1000.1"} {
 					t.Run(field+"/"+value, func(t *testing.T) {
 						before := load()
 						form := url.Values{"total_hours": {"12.5"}, "night_hours": {"2.0"}, "permit_issue_date": {"2026-01-15"}}
