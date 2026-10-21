@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/drywaters/permitpal/internal/config"
@@ -17,7 +18,7 @@ type Store interface {
 	// equals generation, so a stale cookie cannot end newer sessions.
 	EndSessions(ctx context.Context, username string, generation int64) error
 	GetTracker(ctx context.Context, driverID int64) (model.Tracker, error)
-	UpdateProfile(ctx context.Context, driverID int64, profile model.Profile) (model.Profile, error)
+	UpdateProfile(ctx context.Context, driverID int64, profile model.Profile, recordedAt time.Time) (model.Profile, error)
 	UpdateRequirement(ctx context.Context, driverID int64, req model.Requirement) (model.Requirement, error)
 	// Ping reports whether the backing database is reachable.
 	Ping(ctx context.Context) error
@@ -47,4 +48,17 @@ func NewStore(ctx context.Context, cfg *config.Config) (Store, CloseFunc, error)
 	default:
 		return nil, nil, fmt.Errorf("unsupported DATA_STORE %q", cfg.DataStore)
 	}
+}
+
+// Both backends reject invalid cumulative values before integer conversion.
+func validateProfileHours(profile model.Profile) error {
+	for _, hours := range []float64{profile.TotalHours, profile.NightHours} {
+		if math.IsNaN(hours) || math.IsInf(hours, 0) || hours < 0 || hours > model.MaxRecordedHours {
+			return fmt.Errorf("recorded hours must be finite and between 0 and %d", model.MaxRecordedHours)
+		}
+	}
+	if profile.NightHours > profile.TotalHours {
+		return fmt.Errorf("night hours cannot exceed total hours")
+	}
+	return nil
 }

@@ -32,7 +32,7 @@ func TestMemoryDriversAreIsolatedAndIdempotent(t *testing.T) {
 	}
 	date := now
 	profile := model.Profile{TotalHours: 12, NightHours: 2, PermitIssueDate: &date}
-	saved, err := store.UpdateProfile(ctx, aiden.ID, profile)
+	saved, err := store.UpdateProfile(ctx, aiden.ID, profile, now)
 	if err != nil {
 		t.Fatal(err)
 	}

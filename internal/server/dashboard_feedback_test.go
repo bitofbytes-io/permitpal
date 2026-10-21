@@ -60,6 +60,9 @@ func TestDashboardSaveFeedbackInBrowser(t *testing.T) {
 			if !ok || req.Rating != model.RatingFair || model.DateValue(req.RatedOn) != "2025-05-01" || req.Notes != "After clear" {
 				t.Fatalf("saved use-of-lane = %+v, want fair, 2025-05-01, \"After clear\"", req)
 			}
+			if len(tracker.Profile.HourEntries) != 6 {
+				t.Fatalf("journal has %d entries, want six changed saves; duplicate/permit-only/invalid saves must add none", len(tracker.Profile.HourEntries))
+			}
 			if tracker.Profile.TotalHours != 6 || tracker.Profile.NightHours != 2 {
 				t.Fatalf("saved profile = %+v, want 6 total and 2 night hours", tracker.Profile)
 			}
@@ -171,5 +174,49 @@ func TestDashboardScriptsCarryTheCSPNonce(t *testing.T) {
 	}
 	if inline == 0 {
 		t.Fatal("dashboard rendered no inline scripts to check")
+	}
+}
+
+// The cap can exclude most recorded hours, so cumulative inputs must remain
+// usable after either credited requirement has been exceeded in raw totals.
+func TestCumulativeHourCeilingInBrowser(t *testing.T) {
+	if os.Getenv("PERMITPAL_PLAYWRIGHT_MODULE") == "" {
+		t.Skip("PERMITPAL_PLAYWRIGHT_MODULE is not set")
+	}
+	t.Chdir("../..")
+	for _, backend := range []string{"memory", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			app := newTestApp(t)
+			if backend == "postgres" {
+				app.store = browserPostgresStore(t)
+			}
+			now := time.Now().In(app.cfg.Location)
+			driver, err := app.store.EnsureDriver(t.Context(), "aiden", now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			issue := now.AddDate(-2, 0, 0)
+			if _, err = app.store.UpdateProfile(t.Context(), driver.ID, model.Profile{PermitIssueDate: &issue, TotalHours: 60, NightHours: 20}, now.AddDate(0, 0, -7)); err != nil {
+				t.Fatal(err)
+			}
+			ts := httptest.NewServer(app.Router())
+			defer ts.Close()
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+			defer cancel()
+			output, err := exec.CommandContext(ctx, "node", "internal/server/testdata/dashboard_feedback.cjs", ts.URL, "cumulative-limit").CombinedOutput()
+			if err != nil {
+				t.Fatalf("browser cumulative limit: %v\n%s", err, output)
+			}
+			tracker, err := app.store.GetTracker(ctx, driver.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tracker.Profile.TotalHours != 61 || tracker.Profile.NightHours != 21 || len(tracker.Profile.HourEntries) != 4 {
+				t.Fatalf("saved progress=%+v", tracker.Profile)
+			}
+			if credit := model.CreditHours(tracker.Profile); credit.TotalHours != 11 || credit.NightHours != 11 {
+				t.Fatalf("credit=%+v", credit)
+			}
+		})
 	}
 }

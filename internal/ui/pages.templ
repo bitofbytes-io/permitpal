@@ -82,16 +82,17 @@ templ DashboardPage(dashboard model.Dashboard) {
 								<form id="progress-form" class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#progress-form button, #progress-form input">
 									<label for="total_hours">Total hours (current)</label>
 									<div class="inline-unit">
-										<input id="total_hours" name="total_hours" type="text" inputmode="decimal" pattern="(60(\.0)?|[0-5]?[0-9](\.[0-9])?|\.[0-9])" title="Enter 0 to 60 hours, with up to one decimal place" autocomplete="off" value={ model.FormatHours(dashboard.Profile.TotalHours) }/>
-										<span>/ 60</span>
+										<input id="total_hours" name="total_hours" type="text" inputmode="decimal" pattern={ recordedHoursPattern } title={ fmt.Sprintf("Enter 0 to %d hours, with up to one decimal place", model.MaxRecordedHours) } autocomplete="off" value={ model.FormatHours(dashboard.Profile.TotalHours) }/>
+										<span>hours</span>
 									</div>
 									<label for="night_hours">Night hours (current)</label>
 									<div class="inline-unit">
-										<input id="night_hours" name="night_hours" type="text" inputmode="decimal" pattern="(10(\.0)?|[0-9](\.[0-9])?|\.[0-9])" title="Enter 0 to 10 hours, with up to one decimal place" autocomplete="off" value={ model.FormatHours(dashboard.Profile.NightHours) }/>
-										<span>/ 10</span>
+										<input id="night_hours" name="night_hours" type="text" inputmode="decimal" pattern={ recordedHoursPattern } title={ fmt.Sprintf("Enter 0 to %d hours, with up to one decimal place", model.MaxRecordedHours) } autocomplete="off" value={ model.FormatHours(dashboard.Profile.NightHours) }/>
+										<span>hours</span>
 									</div>
 									<label for="permit_issue_date">Permit issue date</label>
 									<input id="permit_issue_date" name="permit_issue_date" type="date" value={ model.DateValue(dashboard.Profile.PermitIssueDate) }/>
+									<p class="entry-note">Keep recording current totals beyond 60 total and 10 night hours when needed. Increases count in the Monday–Sunday week saved, using the entry date rather than the drive date. Corrections remove the newest matching hours first.</p>
 									<button type="submit">Save progress</button>
 									<p class="form-error" role="alert" hidden></p>
 								</form>
@@ -211,6 +212,7 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 	<section id="progress-panel" class="progress-panel" aria-label="Current progress">
 		@hoursGauge("Current hours", "total hours", dashboard.Profile.TotalHours, model.TotalHoursRequired, dashboard.TotalPercent)
 		@hoursGauge("Night hours", "night hours", dashboard.Profile.NightHours, model.NightHoursRequired, dashboard.NightPercent)
+
 		<div class="estimate-sign">
 			<h2>Ready estimate</h2>
 			<div class="estimate-face">
@@ -229,6 +231,16 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 				<p class="save-feedback" role="status">{ savedMessage }</p>
 			}
 		</div>
+        <div class="hour-credit" aria-label="Weekly credited hours">
+            <p>Weekly credited hours: { model.FormatHours(dashboard.HourCredit.TotalHours) } total, including { model.FormatHours(dashboard.HourCredit.NightHours) } night.</p>
+            <p>Up to 10 total hours per Monday–Sunday entry week; night hours count within that limit.</p>
+            if date := dashboard.HourCredit.LastRecordedOn; date != nil {
+                <p>Last recorded entry date: { model.DisplayDate(date) }. This is the save date, not the actual drive date.</p>
+            }
+            if dashboard.HourCredit.UndatedTotal > 0 {
+                <p>Includes { model.FormatHours(dashboard.HourCredit.UndatedTotal) } undated opening hours ({ model.FormatHours(dashboard.HourCredit.UndatedNight) } night). Their weekly credit cannot be verified.</p>
+            }
+        </div>
 	</section>
 }
 

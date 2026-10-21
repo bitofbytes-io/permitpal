@@ -205,3 +205,84 @@ func TestServerErrorsLogTheCauseAndRequestID(t *testing.T) {
 		}
 	}
 }
+
+func TestProfileSaveUsesOneServerLocalEntryTimestamp(t *testing.T) {
+	loc, _ := time.LoadLocation("America/New_York")
+	at := time.Date(2027, 1, 3, 23, 30, 0, 0, loc)
+	store := repository.NewMemoryStore(at)
+	ctx := context.Background()
+	driver, err := store.EnsureDriver(ctx, "aiden", at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := NewDashboardHandler(store, loc)
+	calls := 0
+	h.now = func() time.Time { calls++; return at.UTC() }
+	form := url.Values{"total_hours": {"15"}, "night_hours": {"10"}, "permit_issue_date": {"2025-01-01"}, "recorded_on": {"2027-01-04"}}
+	request := httptest.NewRequest(http.MethodPost, "/profile", strings.NewReader(form.Encode()))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+	h.UpdateProfile(response, request.WithContext(middleware.WithDriver(request.Context(), driver)))
+	if response.Code != http.StatusOK || calls != 1 {
+		t.Fatalf("status=%d, clock calls=%d", response.Code, calls)
+	}
+	tracker, err := store.GetTracker(ctx, driver.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if entries := tracker.Profile.HourEntries; len(entries) != 1 || !entries[0].RecordedAt.Equal(at) || model.DateValue(&entries[0].RecordedOn) != "2027-01-03" {
+		t.Fatalf("entries=%+v", entries)
+	}
+	if !strings.Contains(response.Body.String(), "Waiting on 10-hour weekly cap") || !strings.Contains(response.Body.String(), "Jan 3, 2027") {
+		t.Fatalf("response=%s", response.Body.String())
+	}
+}
+
+func TestCumulativeHoursCanPassCreditedRequirements(t *testing.T) {
+	for _, backend := range []string{"memory", "postgres"} {
+		t.Run(backend, func(t *testing.T) {
+			at := time.Date(2026, 1, 5, 12, 0, 0, 0, time.UTC)
+			store := validationStore(t, backend, at)
+			ctx := context.Background()
+			driver, err := store.EnsureDriver(ctx, "more-hours", at)
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := NewDashboardHandler(store, time.UTC)
+			h.now = func() time.Time { return at }
+			submit := func(total, night string) *httptest.ResponseRecorder {
+				form := url.Values{"total_hours": {total}, "night_hours": {night}, "permit_issue_date": {"2025-01-01"}}
+				request := httptest.NewRequest(http.MethodPost, "/profile", strings.NewReader(form.Encode()))
+				request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				rec := httptest.NewRecorder()
+				h.UpdateProfile(rec, request.WithContext(middleware.WithDriver(request.Context(), driver)))
+				return rec
+			}
+			if rec := submit("60", "20"); rec.Code != http.StatusOK {
+				t.Fatalf("first save: %d %s", rec.Code, rec.Body.String())
+			}
+			at = at.AddDate(0, 0, 7)
+			if rec := submit("61", "21"); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "11.0 total, including 11.0 night") {
+				t.Fatalf("next-week save: %d %s", rec.Code, rec.Body.String())
+			}
+			if rec := submit("1000", "1000"); rec.Code != http.StatusOK {
+				t.Fatalf("maximum save: %d %s", rec.Code, rec.Body.String())
+			}
+			for _, bad := range []string{"1000.1", "1001", "1e100", "NaN", "Inf"} {
+				if rec := submit(bad, "21"); rec.Code != http.StatusBadRequest {
+					t.Fatalf("total %q status=%d", bad, rec.Code)
+				}
+				if rec := submit("1000", bad); rec.Code != http.StatusBadRequest {
+					t.Fatalf("night %q status=%d", bad, rec.Code)
+				}
+			}
+			tracker, err := store.GetTracker(ctx, driver.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tracker.Profile.TotalHours != 1000 || tracker.Profile.NightHours != 1000 || len(tracker.Profile.HourEntries) != 3 {
+				t.Fatalf("invalid save changed progress: %+v", tracker.Profile)
+			}
+		})
+	}
+}

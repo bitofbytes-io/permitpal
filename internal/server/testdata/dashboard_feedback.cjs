@@ -75,6 +75,49 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     const panel = page.locator("#progress-panel");
     const saveProgress = () => settle(page, () => progress.getByRole("button", { name: "Save progress" }).click());
 
+    if (process.argv[3] === "cumulative-limit") {
+      // The server fixture recorded 60 total/20 night last week. Only 10 of
+      // each was credited; this week's new hours must remain recordable.
+      const credit = panel.getByLabel("Weekly credited hours");
+      assert.equal(await page.locator("#total_hours").inputValue(), "60.0");
+      assert.match(await credit.innerText(), /10.0 total, including 10.0 night/);
+      await page.locator("#total_hours").fill("61");
+      await page.locator("#night_hours").fill("21");
+      await saveProgress();
+      assert.deepEqual(await alerts(progress), []);
+      assert.match(await credit.innerText(), /11.0 total, including 11.0 night/);
+      await saveProgress(); // An unchanged next-week submit earns nothing.
+      assert.match(await credit.innerText(), /11.0 total, including 11.0 night/);
+      if (process.env.PERMITPAL_BROWSER_SCREENSHOT_DIR) {
+        const prefix = process.env.PERMITPAL_BROWSER_SCREENSHOT_DIR + "/" + new URL(baseURL).port;
+        await page.screenshot({path: prefix + "-cumulative-desktop.png", fullPage: true});
+        await page.setViewportSize({width: 390, height: 844});
+        await page.screenshot({path: prefix + "-cumulative-mobile.png", fullPage: true});
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+        await page.setViewportSize({width: 1280, height: 720});
+      }
+      await page.locator("#total_hours").fill("1000");
+      await saveProgress();
+      assert.deepEqual(await alerts(progress), []);
+      for (const field of ["total_hours", "night_hours"]) {
+        await page.locator("#" + field).fill("1000");
+        assert.equal(await page.locator("#" + field).evaluate(el => el.checkValidity()), true);
+        await page.locator("#" + field).fill("1000.1");
+        assert.equal(await page.locator("#" + field).evaluate(el => el.checkValidity()), false);
+        await page.locator("#" + field).fill(field === "total_hours" ? "1000" : "21");
+      }
+      await page.locator("#total_hours").fill("61");
+      await page.locator("#night_hours").fill("21");
+      await saveProgress();
+      await page.reload();
+      await page.waitForFunction(() => window.htmx);
+      assert.equal(await page.locator("#total_hours").inputValue(), "61.0");
+      assert.equal(await page.locator("#night_hours").inputValue(), "21.0");
+      assert.match(await credit.innerText(), /11.0 total, including 11.0 night/);
+      assert.deepEqual(problems, []);
+      return;
+    }
+
     await page.locator("#total_hours").fill("4");
     await page.locator("#night_hours").fill("1");
     await saveProgress();
@@ -330,6 +373,31 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     await page.waitForFunction(() => window.htmx);
     assert.deepEqual(await hours(), ["6.0", "2.0"], "the corrected progress did not persist");
     await page.unrouteAll();
+
+    // Cumulative inputs stay unchanged while the separate entry-week credit
+    // and limiting estimate refresh through the real htmx save response.
+    assert.equal(await progressForm.locator("[name=recorded_on], [name=drive_date], [name=weekly_hours]").count(), 0);
+    for (const [total, credited, night] of [[15, 10, 10], [15, 10, 10], [12, 10, 10], [8, 8, 8], [6, 6, 2]]) {
+      await page.locator("#total_hours").fill(String(total));
+      await page.locator("#night_hours").fill(String(night));
+      await saveProgress();
+      assert.match(await panel.getByLabel("Weekly credited hours").innerText(), new RegExp(`Weekly credited hours: ${credited}\\.0 total, including ${night}\\.0 night`));
+      assert.match(await panel.innerText(), /Last recorded entry date:.*save date, not the actual drive date/);
+      if (total > 10) {
+        assert.match(await panel.innerText(), /Waiting on 10-hour weekly cap/);
+        if (process.env.PERMITPAL_BROWSER_SCREENSHOT_DIR && total === 15) {
+          const prefix = process.env.PERMITPAL_BROWSER_SCREENSHOT_DIR + "/" + new URL(baseURL).port;
+          await page.screenshot({path: prefix + "-desktop.png", fullPage: true});
+          await page.setViewportSize({width: 390, height: 844});
+          await page.screenshot({path: prefix + "-mobile.png", fullPage: true});
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, "mobile page overflows");
+          await page.setViewportSize({width: 1280, height: 720});
+        }
+      }
+    }
+    await page.reload();
+    await page.waitForFunction(() => window.htmx);
+    assert.deepEqual(await hours(), ["6.0", "2.0"]);
 
     assert.deepEqual(problems, []);
   } finally {

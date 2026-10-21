@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	maxTotalHours = 60
-	maxNightHours = 10
+	maxTotalHours = model.MaxRecordedHours
+	maxNightHours = model.MaxRecordedHours
 	maxNotesChars = 1000
 )
 
@@ -41,11 +41,15 @@ func (h *DashboardHandler) localNow() time.Time {
 
 // isFuture reports whether date falls after today in the app's time zone.
 func (h *DashboardHandler) isFuture(date *time.Time) bool {
+	return isFutureOn(date, h.localNow())
+}
+
+func isFutureOn(date *time.Time, now time.Time) bool {
 	if date == nil {
 		return false
 	}
-	year, month, day := h.localNow().Date()
-	return date.After(time.Date(year, month, day, 0, 0, 0, 0, h.loc))
+	year, month, day := now.Date()
+	return date.After(time.Date(year, month, day, 0, 0, 0, 0, now.Location()))
 }
 
 func (h *DashboardHandler) dashboard(driver model.Driver, tracker model.Tracker) model.Dashboard {
@@ -66,6 +70,7 @@ func (h *DashboardHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	driver, _ := middleware.DriverFromContext(r.Context())
+	recordedAt := h.localNow()
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Unable to read progress form", http.StatusBadRequest)
 		return
@@ -90,7 +95,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Permit issue date must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
 		return
 	}
-	if h.isFuture(permitIssueDate) {
+	if isFutureOn(permitIssueDate, recordedAt) {
 		http.Error(w, "Permit issue date cannot be in the future", http.StatusBadRequest)
 		return
 	}
@@ -106,14 +111,14 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	profile.NightHours = nightHours
 	profile.PermitIssueDate = permitIssueDate
 
-	tracker.Profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile)
+	tracker.Profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile, recordedAt)
 	if err != nil {
 		middleware.ServerError(w, r, "Unable to save progress", err)
 		return
 	}
 
 	slog.Info("profile updated", "total_hours", tracker.Profile.TotalHours, "night_hours", tracker.Profile.NightHours, "has_permit_issue_date", tracker.Profile.PermitIssueDate != nil)
-	render(w, r, ui.ProfileUpdate(h.dashboard(driver, tracker)))
+	render(w, r, ui.ProfileUpdate(model.NewDashboard(driver, tracker.Profile, tracker.Requirements, recordedAt)))
 }
 
 func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Request) {

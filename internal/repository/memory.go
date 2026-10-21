@@ -58,6 +58,7 @@ func (s *MemoryStore) stateByID(id int64) *driverState {
 	return nil
 }
 func copyProfile(profile model.Profile) model.Profile {
+	profile.HourEntries = append([]model.HourEntry(nil), profile.HourEntries...)
 	if profile.PermitIssueDate != nil {
 		date := *profile.PermitIssueDate
 		profile.PermitIssueDate = &date
@@ -84,14 +85,18 @@ func (s *MemoryStore) GetTracker(_ context.Context, driverID int64) (model.Track
 	}
 	return model.Tracker{Profile: copyProfile(state.profile), Requirements: requirements}, nil
 }
-func (s *MemoryStore) UpdateProfile(_ context.Context, driverID int64, profile model.Profile) (model.Profile, error) {
+func (s *MemoryStore) UpdateProfile(_ context.Context, driverID int64, profile model.Profile, recordedAt time.Time) (model.Profile, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	state := s.stateByID(driverID)
 	if state == nil {
 		return model.Profile{}, ErrNotFound
 	}
-	profile.UpdatedAt = time.Now()
+	if err := validateProfileHours(profile); err != nil {
+		return model.Profile{}, err
+	}
+	profile.HourEntries = model.AppendHourEntry(state.profile, profile, recordedAt)
+	profile.UpdatedAt = recordedAt
 	state.profile = copyProfile(profile)
 	return copyProfile(profile), nil
 }

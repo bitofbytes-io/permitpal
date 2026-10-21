@@ -39,19 +39,53 @@ func (s *PostgresStore) GetTracker(ctx context.Context, driverID int64) (model.T
 	return model.Tracker{Profile: profile, Requirements: requirements}, nil
 }
 
-func (s *PostgresStore) UpdateProfile(ctx context.Context, driverID int64, profile model.Profile) (model.Profile, error) {
-	const query = `
-		insert into app_profile (driver_id, permit_issue_date, total_hours, night_hours, updated_at)
-		values ($4, $1, $2, $3, now())
-		on conflict (driver_id) do update set
-			permit_issue_date = excluded.permit_issue_date,
-			total_hours = excluded.total_hours,
-			night_hours = excluded.night_hours,
-			updated_at = now()
-		returning permit_issue_date, total_hours, night_hours, updated_at`
-	err := s.db.QueryRow(ctx, query, profile.PermitIssueDate, profile.TotalHours, profile.NightHours, driverID).
-		Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
-	return profile, err
+func (s *PostgresStore) UpdateProfile(ctx context.Context, driverID int64, profile model.Profile, recordedAt time.Time) (model.Profile, error) {
+	if err := validateProfileHours(profile); err != nil {
+		return model.Profile{}, err
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return model.Profile{}, err
+	}
+	defer tx.Rollback(ctx)
+	var previous model.Profile
+	err = tx.QueryRow(ctx, `select total_hours,night_hours from app_profile where driver_id=$1 for update`, driverID).Scan(&previous.TotalHours, &previous.NightHours)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Profile{}, ErrNotFound
+	}
+	if err != nil {
+		return model.Profile{}, err
+	}
+	// The row lock serializes comparison, journal insertion, and profile update.
+	previous.HourEntries, err = readHourEntries(ctx, tx, driverID)
+	if err != nil {
+		return model.Profile{}, err
+	}
+	reconciled := model.ReconciledHourEntries(previous)
+	for _, entry := range reconciled[len(previous.HourEntries):] {
+		if _, err = tx.Exec(ctx, `insert into hour_entries (driver_id,recorded_at,recorded_on,total_tenths,night_tenths) values ($1,$2,null,$3,$4)`, driverID, recordedAt, entry.TotalTenths, entry.NightTenths); err != nil {
+			return model.Profile{}, err
+		}
+	}
+	previous.HourEntries = reconciled
+
+	if previous.TotalHours != profile.TotalHours || previous.NightHours != profile.NightHours {
+		entry := model.AppendHourEntry(previous, profile, recordedAt)
+		// Migration 007 already captured any legacy opening balance.
+		last := entry[len(entry)-1]
+		if _, err = tx.Exec(ctx, `insert into hour_entries (driver_id,recorded_at,recorded_on,total_tenths,night_tenths) values ($1,$2,$3,$4,$5)`, driverID, last.RecordedAt, last.RecordedOn, last.TotalTenths, last.NightTenths); err != nil {
+			return model.Profile{}, err
+		}
+	}
+	err = tx.QueryRow(ctx, `update app_profile set permit_issue_date=$2,total_hours=$3,night_hours=$4,updated_at=$5 where driver_id=$1 returning updated_at`, driverID, profile.PermitIssueDate, profile.TotalHours, profile.NightHours, recordedAt).Scan(&profile.UpdatedAt)
+	if err != nil {
+		return model.Profile{}, err
+	}
+	profile.HourEntries = model.AppendHourEntry(previous, profile, recordedAt)
+	if err = tx.Commit(ctx); err != nil {
+		return model.Profile{}, err
+	}
+	return profile, nil
 }
 
 func (s *PostgresStore) UpdateRequirement(ctx context.Context, driverID int64, req model.Requirement) (model.Requirement, error) {
@@ -70,14 +104,48 @@ func (s *PostgresStore) UpdateRequirement(ctx context.Context, driverID int64, r
 
 // getProfile reads the profile row that EnsureDriver creates at every login.
 func (s *PostgresStore) getProfile(ctx context.Context, driverID int64) (model.Profile, error) {
-	const query = `select permit_issue_date, total_hours, night_hours, updated_at from app_profile where driver_id = $1`
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+	if err != nil {
+		return model.Profile{}, err
+	}
+	defer tx.Rollback(ctx)
 	var profile model.Profile
-	err := s.db.QueryRow(ctx, query, driverID).
-		Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
+	err = tx.QueryRow(ctx, `select permit_issue_date,total_hours,night_hours,updated_at from app_profile where driver_id=$1`, driverID).Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Profile{}, ErrNotFound
 	}
-	return profile, err
+	if err != nil {
+		return model.Profile{}, err
+	}
+	profile.HourEntries, err = readHourEntries(ctx, tx, driverID)
+	if err != nil {
+		return model.Profile{}, err
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return model.Profile{}, err
+	}
+	return profile, nil
+}
+
+func readHourEntries(ctx context.Context, tx pgx.Tx, driverID int64) ([]model.HourEntry, error) {
+	rows, err := tx.Query(ctx, `select recorded_at,recorded_on,total_tenths,night_tenths from hour_entries where driver_id=$1 order by id`, driverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var entries []model.HourEntry
+	for rows.Next() {
+		var entry model.HourEntry
+		var date *time.Time
+		if err = rows.Scan(&entry.RecordedAt, &date, &entry.TotalTenths, &entry.NightTenths); err != nil {
+			return nil, err
+		}
+		if date != nil {
+			entry.RecordedOn = *date
+		}
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
 }
 
 func (s *PostgresStore) getRequirements(ctx context.Context, driverID int64) ([]model.Requirement, error) {
