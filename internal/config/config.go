@@ -54,6 +54,9 @@ func Load() (*Config, error) {
 	cfg.LogLevel = strings.ToLower(strings.TrimSpace(getEnv("LOG_LEVEL", "info")))
 	cfg.Port = getEnv("PORT", "4600")
 	cfg.MetricsAddr = strings.TrimSpace(getEnv("METRICS_ADDR", ":9464"))
+	if cfg.MetricsAddr, err = validateMetricsAddr(cfg.MetricsAddr); err != nil {
+		return nil, err
+	}
 	cfg.DatabaseURL, err = getEnvOrFile("DATABASE_URL", "/run/secrets/permitpal_database_url")
 	if err != nil {
 		return nil, err

@@ -106,6 +106,8 @@ Open <http://localhost:4600>. Two unauthenticated probes report status:
 - `/health` returns `200 ok` whenever the process is up. It checks nothing else.
 - `/ready` pings the database with a 2-second timeout. It returns `200 {"status":"ok","db":"ok"}`, or `503 {"status":"degraded","db":"error"}` when the database does not answer; the cause goes to the log, not the response. With `DATA_STORE=memory` it always reports ok.
 
+`METRICS_ADDR` is trimmed and `off` is case-insensitive. Other values must be a valid IP address or hostname plus a numeric port from 0 to 65535 (IPv6 addresses need brackets). Invalid syntax stops startup; validation does not resolve hostnames. Keep the metrics port private and never publish it through Docker or the public proxy.
+
 Prometheus metrics are served at `GET /metrics` on a separate internal listener, `METRICS_ADDR` (default `:9464`), and never on the public port, where `/metrics` returns 404. The Dockerfile does not publish that port, so only peers on the container's network, such as a Prometheus job scraping over the Swarm overlay, can reach it. If the address cannot be bound, PermitPal logs the error and keeps serving without metrics; `METRICS_ADDR=off` turns the listener off. The metrics are:
 
 - `http_requests_total` and `http_request_duration_seconds`, labelled by `method`, chi route pattern (`route`, such as `/requirements/{key}`; requests that match no route, or that a middleware refuses before routing, use `unmatched`) and status `code`. `/health`, `/ready` and `/metrics` are not counted.
