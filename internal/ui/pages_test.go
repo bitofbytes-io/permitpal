@@ -72,10 +72,21 @@ func TestWeekChartFlagsCappedWeeksAndMatchesTotals(t *testing.T) {
 		">Aug</text>",
 		"<td>16.0</td>",
 		"<td>Yes</td>",
+		`<details class="week-values-disclosure">`,
+		"<summary>Exact hours by week</summary>",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("chart missing %q\n%s", want, body)
 		}
+	}
+	if strings.Count(body, "<caption>Logged and credited hours by entry week</caption>") != 2 {
+		t.Fatalf("want the disclosure table and the screen-reader table, html:\n%s", body)
+	}
+	disclosure := strings.Index(body, `<details class="week-values-disclosure">`)
+	srOnly := strings.Index(body, `<div class="sr-only">`)
+	closeDetails := strings.Index(body, "</details>")
+	if disclosure < 0 || srOnly < 0 || closeDetails < 0 || !(disclosure < closeDetails && closeDetails < srOnly) {
+		t.Fatalf("screen-reader table must stay outside the disclosure, html:\n%s", body)
 	}
 
 	var panel bytes.Buffer

@@ -42,33 +42,43 @@ templ WeekCreditChart(chart model.WeekCreditChart) {
 				}
 			</svg>
 			<p class="week-chart-summary">{ weekChartSummary(chart) }</p>
+			<details class="week-values-disclosure">
+				<summary>Exact hours by week</summary>
+				@weekHoursTable(chart)
+			</details>
+			// The disclosure is for sighted keyboard users. This copy stays in the
+			// page so a screen reader can read every week without opening it.
 			<div class="sr-only">
-			<table>
-				<caption>Logged and credited hours by entry week</caption>
-				<thead>
-					<tr>
-						<th scope="col">Week of</th>
-						<th scope="col">Logged total</th>
-						<th scope="col">Credited total</th>
-						<th scope="col">Logged night</th>
-						<th scope="col">Credited night</th>
-						<th scope="col">Capped</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, week := range chart.Weeks {
-						<tr>
-							<td>{ model.DisplayDate(weekStart(week)) }</td>
-							<td>{ model.FormatHours(week.LoggedTotal) }</td>
-							<td>{ model.FormatHours(week.CreditedTotal) }</td>
-							<td>{ model.FormatHours(week.LoggedNight) }</td>
-							<td>{ model.FormatHours(week.CreditedNight) }</td>
-							<td>{ cappedLabel(week.Capped) }</td>
-						</tr>
-					}
-				</tbody>
-			</table>
+				@weekHoursTable(chart)
 			</div>
 		</figure>
 	}
+}
+
+templ weekHoursTable(chart model.WeekCreditChart) {
+	<table class="week-values">
+		<caption>Logged and credited hours by entry week</caption>
+		<thead>
+			<tr>
+				<th scope="col">Week of</th>
+				<th scope="col"><span>Logged</span> <span>total</span></th>
+				<th scope="col"><span>Credited</span> <span>total</span></th>
+				<th scope="col"><span>Logged</span> <span>night</span></th>
+				<th scope="col"><span>Credited</span> <span>night</span></th>
+				<th scope="col">Capped</th>
+			</tr>
+		</thead>
+		<tbody>
+			for _, week := range chart.Weeks {
+				<tr>
+					<td>{ model.DisplayDate(weekStart(week)) }</td>
+					<td>{ model.FormatHours(week.LoggedTotal) }</td>
+					<td>{ model.FormatHours(week.CreditedTotal) }</td>
+					<td>{ model.FormatHours(week.LoggedNight) }</td>
+					<td>{ model.FormatHours(week.CreditedNight) }</td>
+					<td>{ cappedLabel(week.Capped) }</td>
+				</tr>
+			}
+		</tbody>
+	</table>
 }
