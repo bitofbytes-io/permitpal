@@ -31,4 +31,5 @@ ENV SESSION_SECRET_FILE=/run/secrets/permitpal_session_secret
 
 USER permitpal
 EXPOSE 4600
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -q -O - http://127.0.0.1:4600/health || exit 1
 CMD ["./permitpal"]
