@@ -1069,10 +1069,41 @@ input {
   color: #0b3170;
 }
 
+.checklist-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.checklist-toolbar button {
+  min-height: 32px;
+  border: 1px solid #c4b38d;
+  border-radius: 4px;
+  padding: 4px 10px;
+  color: #26302a;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(255, 252, 245, 0.9);
+  box-shadow: none;
+}
+
+.checklist-toolbar button.is-selected {
+  border-color: var(--sign-dark);
+  color: #fff;
+  background: var(--sign);
+}
+
+.checklist-empty {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+}
+
 .checklist-head,
 .checklist-row {
   display: grid;
-  grid-template-columns: 30px minmax(190px, 1.25fr) 48px 48px 48px 155px minmax(170px, 1fr) 44px;
+  grid-template-columns: 30px minmax(190px, 1.25fr) 48px 48px 48px 180px minmax(170px, 1fr) 44px;
   width: max(850px, 100%);
   min-width: 0;
 }
@@ -1188,6 +1219,37 @@ input {
 
 .date-field input::-webkit-date-and-time-value {
   min-width: 0;
+}
+
+/* A mastered skill's status is the sign-off date. The date input is the
+   editor and sits on that text, shown only while it is being changed. */
+.mastered-status {
+  display: grid;
+  align-items: center;
+}
+
+.mastered-status-text,
+.mastered-status input {
+  grid-area: 1 / 1;
+}
+
+.mastered-status-text {
+  color: var(--sign-dark);
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.mastered-status input {
+  opacity: 0;
+}
+
+.mastered-status:focus-within .mastered-status-text {
+  visibility: hidden;
+}
+
+.mastered-status:focus-within input {
+  opacity: 1;
 }
 
 .notes-field input {
@@ -1502,6 +1564,10 @@ input {
     overflow-x: visible;
   }
 
+  .checklist-toolbar {
+    justify-content: center;
+  }
+
   .checklist-head {
     display: none;
   }
@@ -1736,3 +1802,7 @@ input {
   box-shadow: none;
 }
 .clear-rating:hover { color: #1f3324; background: transparent; }
+
+.checklist-row[hidden] {
+  display: none;
+}

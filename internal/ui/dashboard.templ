@@ -60,6 +60,11 @@ templ DashboardPage(dashboard model.Dashboard) {
 								<div class="sheet-title">
 									<h1 id="checklist-heading">Road Test Skill Checklist</h1>
 								</div>
+								<div class="checklist-toolbar" role="group" aria-label="Checklist order">
+									<button type="button" class="is-selected" data-checklist-view="sheet" aria-pressed="true">All skills</button>
+									<button type="button" data-checklist-view="recent" aria-pressed="false">Recently mastered</button>
+								</div>
+								<p id="checklist-empty" class="checklist-empty" hidden>No skills are mastered yet.</p>
 								<div class="checklist-table" aria-label="Driving skills">
 									<div class="checklist-head" role="row">
 										<span>#</span>
@@ -135,6 +140,132 @@ templ DashboardPage(dashboard model.Dashboard) {
 							error.textContent = xhr.responseText.trim();
 							error.hidden = error.textContent === "";
 						});
+					});
+				})();
+
+				// Recently mastered hides skills that are still in practice and
+				// orders the rest by sign-off date, newest first. Sheet order is
+				// the numbered road-test order. Only a checklist swap refreshes
+				// the view, and rows move only when that order changed, so a save
+				// does not steal focus from another skill.
+				(function () {
+					var table = document.querySelector(".checklist-table");
+					var buttons = document.querySelectorAll("[data-checklist-view]");
+					var empty = document.getElementById("checklist-empty");
+					if (!table || buttons.length === 0) {
+						return;
+					}
+
+					function rows() {
+						return Array.prototype.slice.call(table.querySelectorAll(".checklist-row"));
+					}
+
+					function masteredLabel(value) {
+						var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+						if (!match) {
+							return "";
+						}
+						var year = Number(match[1]);
+						var month = Number(match[2]);
+						var day = Number(match[3]);
+						var date = new Date(year, month - 1, day);
+						if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+							return "";
+						}
+						return "Mastered " + date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+					}
+
+					function showEditedDate(input) {
+						var text = input.parentNode && input.parentNode.querySelector(".mastered-status-text");
+						if (!text) {
+							return;
+						}
+						var label = masteredLabel(input.value);
+						text.textContent = label;
+						input.setAttribute("aria-label", label || "Mastered date");
+					}
+
+					table.addEventListener("input", function (event) {
+						if (event.target && event.target.name === "rated_on") {
+							showEditedDate(event.target);
+						}
+					});
+					table.addEventListener("change", function (event) {
+						if (event.target && event.target.name === "rated_on") {
+							showEditedDate(event.target);
+						}
+					});
+
+					function apply(view) {
+						var list = rows();
+						var sorted = list.slice().sort(function (a, b) {
+							if (view === "recent") {
+								var am = a.getAttribute("data-mastered") || "";
+								var bm = b.getAttribute("data-mastered") || "";
+								if (am !== bm) {
+									return bm.localeCompare(am);
+								}
+							}
+							return Number(a.getAttribute("data-order")) - Number(b.getAttribute("data-order"));
+						});
+						var visible = 0;
+						sorted.forEach(function (row) {
+							var show = view !== "recent" || row.hasAttribute("data-mastered");
+							row.hidden = !show;
+							if (show) {
+								visible++;
+							}
+						});
+						var sameOrder = list.length === sorted.length;
+						for (var i = 0; sameOrder && i < sorted.length; i++) {
+							if (list[i] !== sorted[i]) {
+								sameOrder = false;
+							}
+						}
+						if (!sameOrder) {
+							var focus = document.activeElement;
+							var range = null;
+							if (focus && typeof focus.selectionStart === "number") {
+								range = { start: focus.selectionStart, end: focus.selectionEnd };
+							}
+							sorted.forEach(function (row) {
+								table.appendChild(row);
+							});
+							if (focus && document.contains(focus) && typeof focus.focus === "function") {
+								focus.focus();
+								if (range && typeof focus.setSelectionRange === "function") {
+									focus.setSelectionRange(range.start, range.end);
+								}
+							}
+						}
+						if (empty) {
+							empty.hidden = view !== "recent" || visible !== 0;
+						}
+						Array.prototype.forEach.call(buttons, function (button) {
+							var on = button.getAttribute("data-checklist-view") === view;
+							button.classList.toggle("is-selected", on);
+							button.setAttribute("aria-pressed", on ? "true" : "false");
+						});
+					}
+
+					Array.prototype.forEach.call(buttons, function (button) {
+						button.addEventListener("click", function () {
+							apply(button.getAttribute("data-checklist-view"));
+						});
+					});
+					document.addEventListener("htmx:afterSwap", function (event) {
+						var detail = event.detail || {};
+						var target = detail.target;
+						var elt = detail.elt;
+						var inChecklist = target && target.closest && (target.closest(".checklist-table") || target.classList.contains("checklist-table"));
+						var fromRow = elt && elt.closest && elt.closest(".checklist-row");
+						if (!inChecklist && !fromRow) {
+							return;
+						}
+						var selected = document.querySelector("[data-checklist-view].is-selected");
+						if (selected) {
+							apply(selected.getAttribute("data-checklist-view"));
+						}
 					});
 				})();
 			</script>

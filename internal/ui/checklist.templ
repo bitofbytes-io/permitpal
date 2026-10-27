@@ -14,6 +14,10 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 	<form
 		id={ "requirement-" + req.Key }
 		class={ "checklist-row " + requirementRowClass(req.Rating) }
+		data-order={ fmt.Sprintf("%d", req.SortOrder) }
+		if masteredOn(req) != "" {
+			data-mastered={ masteredOn(req) }
+		}
 		hx-post={ "/requirements/" + req.Key }
 		hx-target={ "#requirement-" + req.Key }
 		hx-swap="outerHTML"
@@ -39,10 +43,17 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
             <span class="sr-only">Good</span>
             <input type="radio" name="rating" value="good" checked?={ req.Rating == model.RatingGood }/>
         </label>
-		<label class="date-field">
-			<span class="sr-only">Last rated</span>
-			<input name="rated_on" type="date" value={ model.DateValue(req.RatedOn) }/>
-		</label>
+		if status := masteredStatus(req); status != "" {
+			<label class="date-field mastered-status">
+				<span class="mastered-status-text" aria-hidden="true">{ status }</span>
+				<input name="rated_on" type="date" value={ model.DateValue(req.RatedOn) } aria-label={ status }/>
+			</label>
+		} else {
+			<label class="date-field">
+				<span class="sr-only">Last rated</span>
+				<input name="rated_on" type="date" value={ model.DateValue(req.RatedOn) }/>
+			</label>
+		}
 		<label class="notes-field">
 			<span class="sr-only">Notes</span>
 			<input name="notes" value={ req.Notes }/>

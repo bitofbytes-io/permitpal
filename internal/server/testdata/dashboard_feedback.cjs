@@ -155,6 +155,28 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     await update(row, "Use of lane");
     assert.deepEqual(await statuses(row), ["Saved"]);
     assert.deepEqual(await alerts(row), []);
+    assert.equal(await row.locator(".mastered-status-text").innerText(), "Mastered Jan 1, 2025");
+
+    // Leaving the date field keeps the edited sign-off date on screen.
+    await row.locator("[name=rated_on]").fill("2025-03-15");
+    await row.locator("[name=notes]").focus();
+    assert.equal(await row.locator(".mastered-status-text").innerText(), "Mastered Mar 15, 2025");
+    await row.locator("[name=rated_on]").fill("2025-01-01");
+
+    // A save already in flight must not move another row and drop what is being typed.
+    const heldSave = [];
+    await page.route("**/requirements/use-of-lane", (route) => {
+      heldSave.push(route);
+    });
+    await row.getByRole("button", { name: "Update Use of lane" }).click();
+    await until(() => heldSave.length === 1);
+    const otherNotes = other.locator("[name=notes]");
+    await otherNotes.click();
+    await otherNotes.fill("Keep typing");
+    await settle(page, () => heldSave.shift().continue());
+    assert.equal(await otherNotes.evaluate((el) => document.activeElement === el), true, "another row lost focus during a save");
+    assert.equal(await otherNotes.inputValue(), "Keep typing");
+    await page.unrouteAll();
 
     await row.locator("[name=rated_on]").fill("2099-01-01");
     await row.locator("[name=notes]").fill("Retry later");
