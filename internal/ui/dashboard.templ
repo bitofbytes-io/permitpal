@@ -115,10 +115,25 @@ templ DashboardPage(dashboard model.Dashboard) {
 					}
 
 					function releaseNext() {
-						if (inflight.size > 0 || waiting.length === 0) {
-							return;
+						// A released save can fail to start: the field was edited
+						// invalid while it waited, or its row was already replaced.
+						// Skip it and keep going, or later saves stay queued.
+						while (inflight.size === 0 && waiting.length > 0) {
+							var next = waiting.shift();
+							if (!next.form.isConnected) {
+								continue;
+							}
+							next.issue(true);
 						}
-						waiting.shift()(true);
+					}
+
+					function waitingOn(form) {
+						for (var i = 0; i < waiting.length; i++) {
+							if (waiting[i].form === form) {
+								return true;
+							}
+						}
+						return false;
 					}
 
 					function clearFeedback(form) {
@@ -145,11 +160,20 @@ templ DashboardPage(dashboard model.Dashboard) {
 					// after the in-flight save's response has been applied.
 					document.addEventListener("htmx:confirm", function (event) {
 						var form = saveForm(event.detail.elt);
-						if (!form || inflight.has(form) || (inflight.size === 0 && waiting.length === 0)) {
+						if (!form || inflight.has(form)) {
+							return;
+						}
+						// This form is already waiting, and it has no request yet
+						// for hx-sync to drop. Discard the repeat.
+						if (waitingOn(form)) {
+							event.preventDefault();
+							return;
+						}
+						if (inflight.size === 0 && waiting.length === 0) {
 							return;
 						}
 						event.preventDefault();
-						waiting.push(event.detail.issueRequest);
+						waiting.push({ form: form, issue: event.detail.issueRequest });
 					});
 
 					document.addEventListener("htmx:beforeRequest", function (event) {

@@ -426,6 +426,37 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     assert.deepEqual(await statuses(other), ["Saved"]);
     await page.unrouteAll();
 
+    // A queued hours save is edited invalid before it starts, with another
+    // skill save behind it. The invalid save must not keep that skill save
+    // queued forever. A second click on the waiting hours form is dropped.
+    held = [];
+    await page.route("**/requirements/backing", (route) => {
+      held.push(route);
+    });
+    const backing = page.locator("#requirement-backing");
+    await backing.locator("input[value=fair]").check();
+    await backing.locator("[name=rated_on]").fill("2025-07-01");
+    await backing.getByRole("button", { name: "Update Backing" }).click();
+    await until(() => held.length === 1);
+    const sentBeforeQueue = await page.evaluate(() => window.sent);
+    await page.locator("#total_hours").fill("7");
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await page.locator("#total_hours").fill("1000.1");
+    const following = page.locator("#requirement-following");
+    await following.locator("input[value=fair]").check();
+    await following.locator("[name=rated_on]").fill("2025-07-02");
+    await following.getByRole("button", { name: "Update Following" }).click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => window.sent), sentBeforeQueue, "a queued save was sent while another save was in flight");
+    await settle(page, () => held.shift().continue(), 2);
+    assert.equal(await page.evaluate(() => window.sent), sentBeforeQueue + 1, "a save behind a halted request stayed queued");
+    assert.equal(held.length, 0);
+    assert.deepEqual(await statuses(following), ["Saved"]);
+    assert.equal(await page.locator("#total_hours").inputValue(), "1000.1");
+    await page.locator("#total_hours").fill("6");
+    await page.unrouteAll();
+
     // Cumulative inputs stay unchanged while the separate entry-week credit
     // and limiting estimate refresh through the real htmx save response.
     assert.equal(await progressForm.locator("[name=recorded_on], [name=drive_date], [name=weekly_hours]").count(), 0);
