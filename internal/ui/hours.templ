@@ -12,6 +12,7 @@ templ ProgressPanel(dashboard model.Dashboard) {
 
 templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 	<section id="progress-panel" class="progress-panel" aria-label="Current progress">
+		@LastDriveNudge(dashboard.LastDrive)
 		@hoursGauge("Current hours", "total hours", dashboard.Profile.TotalHours, model.TotalHoursRequired, dashboard.TotalPercent)
 		@hoursGauge("Night hours", "night hours", dashboard.Profile.NightHours, model.NightHoursRequired, dashboard.NightPercent)
 
@@ -36,14 +37,38 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
         <div class="hour-credit" aria-label="Weekly credited hours">
             <p>Weekly credited hours: { model.FormatHours(dashboard.HourCredit.TotalHours) } total, including { model.FormatHours(dashboard.HourCredit.NightHours) } night.</p>
             <p>Up to 10 total hours per Monday–Sunday entry week; night hours count within that limit.</p>
-            if date := dashboard.HourCredit.LastRecordedOn; date != nil {
-                <p>Last recorded entry date: { model.DisplayDate(date) }. This is the save date, not the actual drive date.</p>
-            }
             if dashboard.HourCredit.UndatedTotal > 0 {
                 <p>Includes { model.FormatHours(dashboard.HourCredit.UndatedTotal) } undated opening hours ({ model.FormatHours(dashboard.HourCredit.UndatedNight) } night). Their weekly credit cannot be verified.</p>
             }
             @WeekCreditChart(dashboard.WeekChart)
         </div>
+	</section>
+}
+
+// LastDriveNudge shows how long it has been since the latest dated hour
+// entry, and how much of this week's credit is still open. A gap longer
+// than a week is highlighted because that week cannot be made up.
+templ LastDriveNudge(nudge model.LastDrive) {
+	<section class={ driveNudgeClass(nudge.Stale) } aria-labelledby="last-drive-heading">
+		<h2 id="last-drive-heading">Days since last drive</h2>
+		if !nudge.Dated {
+			<p><strong>No dated driving entries yet.</strong></p>
+		} else if nudge.Days == 0 {
+			<p><strong>Last dated entry was today</strong> ({ model.DisplayDate(nudge.RecordedOn) }).</p>
+		} else {
+			<p><strong>{ fmt.Sprint(nudge.Days) } { daysWord(nudge.Days) }</strong> since the last dated entry ({ model.DisplayDate(nudge.RecordedOn) }).</p>
+		}
+		if nudge.RemainingHours == 0 {
+			<p>This week's { fmt.Sprint(model.WeeklyHourCap) }-hour credit is used up.</p>
+		} else {
+			<p>{ model.FormatHours(nudge.RemainingHours) } hours of this week's credit remain.</p>
+		}
+		if nudge.Stale {
+			<p>This gap is longer than { fmt.Sprint(model.LastDriveHighlightAfterDays) } days. A skipped week cannot be made up under the { fmt.Sprint(model.WeeklyHourCap) }-hour cap.</p>
+		}
+		if nudge.Dated {
+			<p class="drive-nudge-note">The entry date is the save date, not the actual drive date.</p>
+		}
 	</section>
 }
 

@@ -382,7 +382,8 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
       await page.locator("#night_hours").fill(String(night));
       await saveProgress();
       assert.match(await panel.getByLabel("Weekly credited hours").innerText(), new RegExp(`Weekly credited hours: ${credited}\\.0 total, including ${night}\\.0 night`));
-      assert.match(await panel.innerText(), /Last recorded entry date:.*save date, not the actual drive date/);
+      assert.match(await panel.innerText(), /Last dated entry was today/);
+      assert.match(await panel.innerText(), /The entry date is the save date, not the actual drive date/);
       if (total > 10) {
         assert.match(await panel.innerText(), /Waiting on 10-hour weekly cap/);
         if (process.env.PERMITPAL_BROWSER_SCREENSHOT_DIR && total === 15) {

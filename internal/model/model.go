@@ -94,6 +94,7 @@ type Dashboard struct {
 	GoodCount     int
 	HourCredit    HourCredit
 	WeekChart     WeekCreditChart
+	LastDrive     LastDrive
 }
 
 func NewDashboard(driver Driver, profile Profile, requirements []Requirement, now time.Time) Dashboard {
@@ -126,6 +127,7 @@ func NewDashboard(driver Driver, profile Profile, requirements []Requirement, no
 		GoodCount:     good,
 		HourCredit:    credit,
 		WeekChart:     WeeklyCreditChart(credit, now, ChartWeeks),
+		LastDrive:     DaysSinceLastDrive(credit, now),
 	}
 }
 

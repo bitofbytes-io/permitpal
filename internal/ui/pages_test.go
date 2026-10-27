@@ -100,6 +100,57 @@ func TestWeekChartFlagsCappedWeeksAndMatchesTotals(t *testing.T) {
 	}
 }
 
+func TestLastDriveNudgeHighlightsGapsAfterSevenDays(t *testing.T) {
+	on := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name  string
+		nudge model.LastDrive
+		want  []string
+		miss  []string
+	}{
+		{
+			name:  "no dated entries",
+			nudge: model.LastDrive{RemainingHours: 10},
+			want:  []string{"Days since last drive", "No dated driving entries yet.", "10.0 hours of this week's credit remain."},
+			miss:  []string{"drive-nudge--stale", "save date"},
+		},
+		{
+			name:  "quiet week",
+			nudge: model.LastDrive{Dated: true, Days: 7, RecordedOn: &on, RemainingHours: 3.5},
+			want:  []string{`class="drive-nudge"`, "7 days", "since the last dated entry (Oct 13, 2026)", "3.5 hours of this week's credit remain.", "save date, not the actual drive date"},
+			miss:  []string{"drive-nudge--stale", "longer than 7 days"},
+		},
+		{
+			name:  "stale gap",
+			nudge: model.LastDrive{Dated: true, Days: 14, RecordedOn: &on, RemainingHours: 10, Stale: true},
+			want:  []string{"drive-nudge drive-nudge--stale", "14 days", "longer than 7 days", "10.0 hours of this week's credit remain."},
+		},
+		{
+			name:  "logged today",
+			nudge: model.LastDrive{Dated: true, RecordedOn: &on, RemainingHours: 0},
+			want:  []string{"Last dated entry was today", "This week's 10-hour credit is used up."},
+			miss:  []string{"drive-nudge--stale"},
+		},
+	}
+	for _, tt := range tests {
+		var buf bytes.Buffer
+		if err := ProgressPanel(model.Dashboard{LastDrive: tt.nudge}).Render(context.Background(), &buf); err != nil {
+			t.Fatal(err)
+		}
+		body := buf.String()
+		for _, want := range tt.want {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s: panel missing %q", tt.name, want)
+			}
+		}
+		for _, miss := range tt.miss {
+			if strings.Contains(body, miss) {
+				t.Errorf("%s: panel unexpectedly contains %q", tt.name, miss)
+			}
+		}
+	}
+}
+
 func TestWhatsLeftCountsDownPermitHold(t *testing.T) {
 	ends := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
