@@ -1,0 +1,30 @@
+package ui
+
+// pageHead renders the shared <head>; children go before the Umami loader.
+templ pageHead(title string) {
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1"/>
+		<title>{ title }</title>
+		<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
+		<link rel="stylesheet" href="/static/styles.css"/>
+		{ children... }
+		@UmamiScript()
+	</head>
+}
+
+templ UmamiScript() {
+	<script nonce={ templ.GetNonce(ctx) }>
+		(function () {
+			if (window.location.hostname !== "permitpal.bitofbytes.io") {
+				return;
+			}
+
+			var script = document.createElement("script");
+			script.async = true;
+			script.dataset.websiteId = "f00f467f-a361-4eae-aee2-ef7bbc41ef70";
+			script.src = "https://permitpal.bitofbytes.io/umami/script.js";
+			document.head.appendChild(script);
+		})();
+	</script>
+}
