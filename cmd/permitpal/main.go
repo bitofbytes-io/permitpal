@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -19,18 +20,26 @@ import (
 )
 
 func main() {
+	if err := run(context.Background()); err != nil {
+		slog.Error("permitpal stopped", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context) error {
 	cfg, err := config.Load()
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slogLevel(cfg)}))
 	slog.SetDefault(logger)
 	if err != nil {
-		logger.Error("failed to load config", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	store, closeStore, err := repository.NewStore(context.Background(), cfg)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	store, closeStore, err := repository.NewStore(ctx, cfg)
 	if err != nil {
-		logger.Error("failed to initialize store", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to initialize store: %w", err)
 	}
 	defer closeStore()
 
@@ -39,9 +48,7 @@ func main() {
 	// collision disables metrics instead of stopping PermitPal.
 	listener, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
-		logger.Error("server failed", "error", err)
-		closeStore()
-		os.Exit(1)
+		return fmt.Errorf("server failed: %w", err)
 	}
 
 	var poolCollectors []prometheus.Collector
@@ -60,22 +67,21 @@ func main() {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	select {
-	case <-stop:
+	case <-ctx.Done():
 	case err := <-serverErr:
 		logger.Error("server failed", "error", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("server shutdown failed", "error", err)
 	}
-	if err := metricsSrv.Shutdown(ctx); err != nil {
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("metrics shutdown failed", "error", err)
 	}
+	return nil
 }
 
 func slogLevel(cfg *config.Config) slog.Level {
