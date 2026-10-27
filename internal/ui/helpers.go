@@ -13,6 +13,24 @@ func progressStyle(percent int) string {
 	return fmt.Sprintf("--progress:%d%%", percent)
 }
 
+// masteredOn is the sign-off date of a good rating, or empty when the skill
+// is not mastered.
+func masteredOn(req model.Requirement) string {
+	if req.Rating != model.RatingGood || req.RatedOn == nil {
+		return ""
+	}
+	return model.DateValue(req.RatedOn)
+}
+
+// masteredStatus is the checklist status for a mastered skill, for example
+// "Mastered Oct 27, 2026". It is empty until the skill has a sign-off date.
+func masteredStatus(req model.Requirement) string {
+	if masteredOn(req) == "" {
+		return ""
+	}
+	return "Mastered " + model.DisplayDate(req.RatedOn)
+}
+
 func requirementRowClass(rating model.RequirementRating) string {
 	switch rating {
 	case model.RatingBad, model.RatingFair, model.RatingGood:

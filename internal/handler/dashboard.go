@@ -164,15 +164,9 @@ func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	existing.Rating = rating
-	existing.RatedOn = ratedOn
-	existing.Notes = notes
-	if existing.Rating == model.RatingNotRated {
-		existing.RatedOn = nil
-	} else if existing.RatedOn == nil {
-		date, _ := model.ParseDate(h.localNow().Format("2006-01-02"), h.loc)
-		existing.RatedOn = date
-	}
+	year, month, day := h.localNow().Date()
+	today := time.Date(year, month, day, 0, 0, 0, 0, h.loc)
+	existing = model.ApplyRequirementUpdate(existing, rating, ratedOn, notes, today)
 
 	updated, err := h.store.UpdateRequirement(r.Context(), driver.ID, existing)
 	if err != nil {

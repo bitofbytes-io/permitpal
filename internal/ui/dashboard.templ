@@ -60,6 +60,11 @@ templ DashboardPage(dashboard model.Dashboard) {
 								<div class="sheet-title">
 									<h1 id="checklist-heading">Road Test Skill Checklist</h1>
 								</div>
+								<div class="checklist-toolbar" role="group" aria-label="Checklist order">
+									<button type="button" class="is-selected" data-checklist-view="sheet" aria-pressed="true">All skills</button>
+									<button type="button" data-checklist-view="recent" aria-pressed="false">Recently mastered</button>
+								</div>
+								<p id="checklist-empty" class="checklist-empty" hidden>No skills are mastered yet.</p>
 								<div class="checklist-table" aria-label="Driving skills">
 									<div class="checklist-head" role="row">
 										<span>#</span>
@@ -135,6 +140,66 @@ templ DashboardPage(dashboard model.Dashboard) {
 							error.textContent = xhr.responseText.trim();
 							error.hidden = error.textContent === "";
 						});
+					});
+				})();
+
+				// Recently mastered hides skills that are still in practice and
+				// orders the rest by sign-off date, newest first. Sheet order is
+				// the numbered road-test order. A saved row is swapped in place,
+				// so the selected view is applied again after htmx settles.
+				(function () {
+					var table = document.querySelector(".checklist-table");
+					var buttons = document.querySelectorAll("[data-checklist-view]");
+					var empty = document.getElementById("checklist-empty");
+					if (!table || buttons.length === 0) {
+						return;
+					}
+
+					function rows() {
+						return Array.prototype.slice.call(table.querySelectorAll(".checklist-row"));
+					}
+
+					function apply(view) {
+						var list = rows();
+						list.sort(function (a, b) {
+							if (view === "recent") {
+								var am = a.getAttribute("data-mastered") || "";
+								var bm = b.getAttribute("data-mastered") || "";
+								if (am !== bm) {
+									return bm.localeCompare(am);
+								}
+							}
+							return Number(a.getAttribute("data-order")) - Number(b.getAttribute("data-order"));
+						});
+						var visible = 0;
+						list.forEach(function (row) {
+							var show = view !== "recent" || row.hasAttribute("data-mastered");
+							row.hidden = !show;
+							if (show) {
+								visible++;
+							}
+							table.appendChild(row);
+						});
+						if (empty) {
+							empty.hidden = view !== "recent" || visible !== 0;
+						}
+						Array.prototype.forEach.call(buttons, function (button) {
+							var on = button.getAttribute("data-checklist-view") === view;
+							button.classList.toggle("is-selected", on);
+							button.setAttribute("aria-pressed", on ? "true" : "false");
+						});
+					}
+
+					Array.prototype.forEach.call(buttons, function (button) {
+						button.addEventListener("click", function () {
+							apply(button.getAttribute("data-checklist-view"));
+						});
+					});
+					document.addEventListener("htmx:afterSwap", function () {
+						var selected = document.querySelector("[data-checklist-view].is-selected");
+						if (selected) {
+							apply(selected.getAttribute("data-checklist-view"));
+						}
 					});
 				})();
 			</script>
