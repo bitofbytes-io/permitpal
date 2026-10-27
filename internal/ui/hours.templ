@@ -24,7 +24,7 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 					<span>{ estimateLabel(dashboard.ReadyEstimate.WaitingOn) }</span>
 					<strong class="estimate-date">{ date.Format("January 2, 2006") }</strong>
 				} else {
-					<strong>{ dashboard.ReadyEstimate.Hint }</strong>
+					<strong>{ estimateHint(dashboard) }</strong>
 				}
 			</div>
 			if note := estimateNote(dashboard.ReadyEstimate.WaitingOn); note != "" {

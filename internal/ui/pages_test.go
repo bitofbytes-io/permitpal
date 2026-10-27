@@ -40,6 +40,17 @@ func TestProgressPanelNamesReadyConstraint(t *testing.T) {
 	if strings.Contains(buf.String(), "estimate-note") {
 		t.Error("hint-only estimate should not show a constraint note")
 	}
+
+	var ready bytes.Buffer
+	if err := ProgressPanel(model.Dashboard{
+		ReadyEstimate: model.ReadyEstimate{Hint: "Ready when every skill is rated Good"},
+		Readiness:     model.RoadTestReadiness{Ready: true},
+	}).Render(context.Background(), &ready); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(ready.String(), "Hours and skills are met") || strings.Contains(ready.String(), "Ready when every skill is rated Good") {
+		t.Fatalf("ready estimate should agree with the readiness card: %s", ready.String())
+	}
 }
 
 func TestWeekChartFlagsCappedWeeksAndMatchesTotals(t *testing.T) {
