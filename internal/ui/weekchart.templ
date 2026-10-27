@@ -42,7 +42,8 @@ templ WeekCreditChart(chart model.WeekCreditChart) {
 				}
 			</svg>
 			<p class="week-chart-summary">{ weekChartSummary(chart) }</p>
-			<table class="sr-only">
+			<div class="sr-only">
+			<table>
 				<caption>Logged and credited hours by entry week</caption>
 				<thead>
 					<tr>
@@ -67,6 +68,7 @@ templ WeekCreditChart(chart model.WeekCreditChart) {
 					}
 				</tbody>
 			</table>
+			</div>
 		</figure>
 	}
 }

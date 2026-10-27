@@ -316,6 +316,12 @@ input {
   margin: 10px 0 0;
 }
 
+/* The week table is for screen readers. A table ignores the shared 1px
+   clip, so keep it inside an element that can actually be clipped. */
+.week-chart .sr-only {
+  overflow: hidden;
+}
+
 .week-chart h3 {
   margin: 0 0 4px;
   font-size: 0.95rem;
