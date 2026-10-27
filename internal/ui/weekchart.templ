@@ -1,0 +1,72 @@
+package ui
+
+import "github.com/drywaters/permitpal/internal/model"
+
+// WeekCreditChart draws logged and credited hours for recent entry weeks.
+// The dashboard calls it from the hour-credit block; other dashboard sections
+// stay in their own templates.
+templ WeekCreditChart(chart model.WeekCreditChart) {
+	if len(chart.Weeks) > 0 {
+		{{ draw := drawWeekChart(chart) }}
+		<figure class="week-chart">
+			<h3 id="week-chart-heading">Hours by entry week</h3>
+			<p class="week-chart-note">{ weekChartNote(chart) }</p>
+			<ul class="week-chart-legend">
+				<li><span class="week-swatch week-swatch--credited" aria-hidden="true"></span> Credited total</li>
+				<li><span class="week-swatch week-swatch--logged" aria-hidden="true"></span> Logged total</li>
+				<li><span class="week-swatch week-swatch--night" aria-hidden="true"></span> Credited night</li>
+				<li><span class="week-swatch week-swatch--night-logged" aria-hidden="true"></span> Logged night</li>
+				<li><span class="week-swatch week-swatch--capped" aria-hidden="true"></span> Capped week</li>
+			</ul>
+			<svg class="week-chart-svg" viewBox={ draw.ViewBox } role="img" aria-labelledby="week-chart-title">
+				<title id="week-chart-title">{ weekChartTitle(chart) }</title>
+				<line class="week-cap-line" x1={ draw.CapLine.X1 } y1={ draw.CapLine.Y1 } x2={ draw.CapLine.X2 } y2={ draw.CapLine.Y2 }></line>
+				<line class="week-axis" x1={ draw.Axis.X1 } y1={ draw.Axis.Y1 } x2={ draw.Axis.X2 } y2={ draw.Axis.Y2 }></line>
+				for _, label := range draw.Labels {
+					<text class={ label.Class } x={ label.X } y={ label.Y } dy={ label.DY } text-anchor={ label.Anchor } font-size="10">{ label.Text }</text>
+				}
+				for _, column := range draw.Columns {
+					<g class={ column.Class }>
+						<title>{ column.Title }</title>
+						for _, bar := range column.Bars {
+							<rect class={ bar.Class } x={ bar.X } y={ bar.Y } width={ bar.W } height={ bar.H }></rect>
+						}
+						if column.Flag != "" {
+							<polygon class="week-flag" points={ column.Flag }></polygon>
+						}
+						<text class={ column.Day.Class } x={ column.Day.X } y={ column.Day.Y } text-anchor={ column.Day.Anchor } font-size="11">{ column.Day.Text }</text>
+						if column.Month.Text != "" {
+							<text class={ column.Month.Class } x={ column.Month.X } y={ column.Month.Y } text-anchor={ column.Month.Anchor } font-size="10">{ column.Month.Text }</text>
+						}
+					</g>
+				}
+			</svg>
+			<p class="week-chart-summary">{ weekChartSummary(chart) }</p>
+			<table class="sr-only">
+				<caption>Logged and credited hours by entry week</caption>
+				<thead>
+					<tr>
+						<th scope="col">Week of</th>
+						<th scope="col">Logged total</th>
+						<th scope="col">Credited total</th>
+						<th scope="col">Logged night</th>
+						<th scope="col">Credited night</th>
+						<th scope="col">Capped</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, week := range chart.Weeks {
+						<tr>
+							<td>{ model.DisplayDate(weekStart(week)) }</td>
+							<td>{ model.FormatHours(week.LoggedTotal) }</td>
+							<td>{ model.FormatHours(week.CreditedTotal) }</td>
+							<td>{ model.FormatHours(week.LoggedNight) }</td>
+							<td>{ model.FormatHours(week.CreditedNight) }</td>
+							<td>{ cappedLabel(week.Capped) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</figure>
+	}
+}

@@ -115,6 +115,81 @@ func CreditHours(profile Profile) HourCredit {
 	return credit
 }
 
+// WeekCreditBar is one Monday–Sunday entry week: hours logged that week and
+// the hours credited after the weekly cap. Capped weeks logged more than the cap.
+type WeekCreditBar struct {
+	Starts                       time.Time
+	LoggedTotal, LoggedNight     float64
+	CreditedTotal, CreditedNight float64
+	Capped                       bool
+}
+
+// WeekCreditChart is the recent entry weeks ending at today. Credited hours in
+// the window, earlier weeks, later weeks, and the undated opening balance add
+// up to TotalHours and NightHours, which are the HourCredit totals shown on
+// the dashboard.
+type WeekCreditChart struct {
+	Weeks                      []WeekCreditBar
+	WindowTotal, WindowNight   float64
+	EarlierTotal, EarlierNight float64
+	LaterTotal, LaterNight     float64
+	UndatedTotal, UndatedNight float64
+	TotalHours, NightHours     float64
+}
+
+// WeeklyCreditChart places credited and logged hours into the last `weeks`
+// ISO weeks ending at today. A Sunday stays in the week that began the
+// previous Monday, so a Sunday night and the following Monday land in
+// adjacent bars. Hours outside the window stay in Earlier or Later and still
+// count toward the dashboard totals.
+func WeeklyCreditChart(credit HourCredit, today time.Time, weeks int) WeekCreditChart {
+	if weeks < 1 {
+		weeks = ChartWeeks
+	}
+	end := isoWeekStart(today)
+	start := end.AddDate(0, 0, -7*(weeks-1))
+	byWeek := make(map[time.Time]WeeklyHours, len(credit.Weeks))
+	for _, week := range credit.Weeks {
+		byWeek[week.Starts] = week
+	}
+	chart := WeekCreditChart{
+		Weeks:        make([]WeekCreditBar, 0, weeks),
+		UndatedTotal: credit.UndatedTotal,
+		UndatedNight: credit.UndatedNight,
+		TotalHours:   credit.TotalHours,
+		NightHours:   credit.NightHours,
+	}
+	inWindow := make(map[time.Time]bool, weeks)
+	for i := 0; i < weeks; i++ {
+		day := start.AddDate(0, 0, 7*i)
+		inWindow[day] = true
+		bar := WeekCreditBar{Starts: day}
+		if week, ok := byWeek[day]; ok {
+			bar.LoggedTotal = week.RawTotal
+			bar.LoggedNight = week.RawNight
+			bar.CreditedTotal = week.TotalHours
+			bar.CreditedNight = week.NightHours
+			bar.Capped = hourTenths(week.RawTotal) > WeeklyHourCap*10
+		}
+		chart.WindowTotal += bar.CreditedTotal
+		chart.WindowNight += bar.CreditedNight
+		chart.Weeks = append(chart.Weeks, bar)
+	}
+	for _, week := range credit.Weeks {
+		if inWindow[week.Starts] {
+			continue
+		}
+		if week.Starts.Before(start) {
+			chart.EarlierTotal += week.TotalHours
+			chart.EarlierNight += week.NightHours
+			continue
+		}
+		chart.LaterTotal += week.TotalHours
+		chart.LaterNight += week.NightHours
+	}
+	return chart
+}
+
 func isoWeekStart(date time.Time) time.Time {
 	date = startOfDay(date)
 	return date.AddDate(0, 0, -(int(date.Weekday())+6)%7)

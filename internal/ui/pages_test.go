@@ -42,6 +42,53 @@ func TestProgressPanelNamesReadyConstraint(t *testing.T) {
 	}
 }
 
+func TestWeekChartFlagsCappedWeeksAndMatchesTotals(t *testing.T) {
+	start := time.Date(2026, 8, 3, 0, 0, 0, 0, time.UTC)
+	chart := model.WeekCreditChart{
+		Weeks: []model.WeekCreditBar{
+			{Starts: start, LoggedTotal: 16, LoggedNight: 4, CreditedTotal: 10, CreditedNight: 4, Capped: true},
+			{Starts: start.AddDate(0, 0, 7), LoggedTotal: 3, LoggedNight: 1, CreditedTotal: 3, CreditedNight: 1},
+		},
+		WindowTotal:  13,
+		WindowNight:  5,
+		UndatedTotal: 4,
+		UndatedNight: 1,
+		TotalHours:   17,
+		NightHours:   6,
+	}
+	var buf bytes.Buffer
+	if err := WeekCreditChart(chart).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	body := buf.String()
+	for _, want := range []string{
+		"Hours by entry week",
+		"week-flag",
+		"week-label week-label--capped",
+		"Capped: week of Aug 3, 2026 (lost 6.0).",
+		"These 2 weeks credit 13.0 total and 5.0 night.",
+		"Undated opening hours add 4.0 total and 1.0 night.",
+		"Together this is 17.0 total and 6.0 night, the same weekly credited total shown above.",
+		">Aug</text>",
+		"<td>16.0</td>",
+		"<td>Yes</td>",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("chart missing %q\n%s", want, body)
+		}
+	}
+
+	var panel bytes.Buffer
+	dashboard := model.Dashboard{HourCredit: model.HourCredit{TotalHours: chart.TotalHours, NightHours: chart.NightHours}, WeekChart: chart}
+	if err := ProgressPanel(dashboard).Render(context.Background(), &panel); err != nil {
+		t.Fatal(err)
+	}
+	panelHTML := panel.String()
+	if !strings.Contains(panelHTML, "Weekly credited hours: 17.0 total, including 6.0 night.") || !strings.Contains(panelHTML, "Together this is 17.0 total and 6.0 night") {
+		t.Fatalf("panel totals diverged: %s", panelHTML)
+	}
+}
+
 func TestWhatsLeftCountsDownPermitHold(t *testing.T) {
 	ends := time.Date(2026, 12, 2, 0, 0, 0, 0, time.UTC)
 	tests := []struct {

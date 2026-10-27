@@ -42,6 +42,7 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
             if dashboard.HourCredit.UndatedTotal > 0 {
                 <p>Includes { model.FormatHours(dashboard.HourCredit.UndatedTotal) } undated opening hours ({ model.FormatHours(dashboard.HourCredit.UndatedNight) } night). Their weekly credit cannot be verified.</p>
             }
+            @WeekCreditChart(dashboard.WeekChart)
         </div>
 	</section>
 }
