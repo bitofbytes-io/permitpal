@@ -253,6 +253,10 @@ func ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) te
 				return templ_7745c5c3_Err
 			}
 		}
+		templ_7745c5c3_Err = WeekCreditChart(dashboard.WeekChart).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -289,7 +293,7 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(heading)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 51, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 52, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -302,7 +306,7 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(hours) + " " + unit)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 53, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 54, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -326,7 +330,7 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(char)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 58, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 59, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -345,7 +349,7 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/ %g", required))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 62, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 63, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -358,7 +362,7 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(progressStyle(percent))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 64, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 65, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -371,7 +375,7 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(model.FormatHours(hours))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 66, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/hours.templ`, Line: 67, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {

@@ -21,6 +21,8 @@ const (
 	// WeeklyHourCap is the maximum credited driving hours per calendar week.
 	// Applied to increments grouped by their recorded ISO calendar week.
 	WeeklyHourCap = 10
+	// ChartWeeks is how many recent Monday–Sunday entry weeks the dashboard chart shows.
+	ChartWeeks = 12
 )
 
 // North Carolina jurisdiction copy used by the road-test checklist.
@@ -91,6 +93,7 @@ type Dashboard struct {
 	NightPercent  int
 	GoodCount     int
 	HourCredit    HourCredit
+	WeekChart     WeekCreditChart
 }
 
 func NewDashboard(driver Driver, profile Profile, requirements []Requirement, now time.Time) Dashboard {
@@ -110,7 +113,20 @@ func NewDashboard(driver Driver, profile Profile, requirements []Requirement, no
 			}
 		}
 	}
-	return Dashboard{Driver: driver, Profile: profile, Requirements: ordered, PracticeFocus: focus, ReadyEstimate: EstimateReadyDate(profile, now), PermitHold: NewPermitHold(profile, now), TotalPercent: Percent(profile.TotalHours, TotalHoursRequired), NightPercent: Percent(profile.NightHours, NightHoursRequired), GoodCount: good, HourCredit: CreditHours(profile)}
+	credit := CreditHours(profile)
+	return Dashboard{
+		Driver:        driver,
+		Profile:       profile,
+		Requirements:  ordered,
+		PracticeFocus: focus,
+		ReadyEstimate: EstimateReadyDate(profile, now),
+		PermitHold:    NewPermitHold(profile, now),
+		TotalPercent:  Percent(profile.TotalHours, TotalHoursRequired),
+		NightPercent:  Percent(profile.NightHours, NightHoursRequired),
+		GoodCount:     good,
+		HourCredit:    credit,
+		WeekChart:     WeeklyCreditChart(credit, now, ChartWeeks),
+	}
 }
 
 func Percent(value, target float64) int {

@@ -233,8 +233,17 @@ func TestProfileSaveUsesOneServerLocalEntryTimestamp(t *testing.T) {
 	if entries := tracker.Profile.HourEntries; len(entries) != 1 || !entries[0].RecordedAt.Equal(at) || model.DateValue(&entries[0].RecordedOn) != "2027-01-03" {
 		t.Fatalf("entries=%+v", entries)
 	}
-	if !strings.Contains(response.Body.String(), "Waiting on 10-hour weekly cap") || !strings.Contains(response.Body.String(), "Jan 3, 2027") {
-		t.Fatalf("response=%s", response.Body.String())
+	body := response.Body.String()
+	for _, want := range []string{
+		"Waiting on 10-hour weekly cap",
+		"Jan 3, 2027",
+		"Hours by entry week",
+		"These 12 weeks credit 10.0 total and 10.0 night, the same weekly credited total shown above.",
+		"Capped: week of Dec 28, 2026 (lost 5.0)",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response missing %q: %s", want, body)
+		}
 	}
 }
 
