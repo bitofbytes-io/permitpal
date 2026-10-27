@@ -10,7 +10,7 @@ COPY . .
 RUN go tool templ generate
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/permitpal ./cmd/permitpal
 
-FROM alpine:3.23
+FROM alpine:3.23.4
 WORKDIR /app
 
 RUN apk add --no-cache ca-certificates
