@@ -674,6 +674,11 @@ input {
   color: white;
 }
 
+/* The sign's children stay on the estimate grid, including after a skill save swaps this element. */
+.ready-estimate {
+  display: contents;
+}
+
 .estimate-sign h2 {
   color: var(--ink);
 }

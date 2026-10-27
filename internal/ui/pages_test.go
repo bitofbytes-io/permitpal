@@ -207,6 +207,47 @@ func TestProfileUpdateRefreshesCountdown(t *testing.T) {
 	}
 }
 
+func TestRequirementUpdateRefreshesReadyEstimate(t *testing.T) {
+	now := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	permit := time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC)
+	profile := model.Profile{PermitIssueDate: &permit, TotalHours: 60, NightHours: 10}
+	requirements := model.DefaultRequirements(now)
+	for i := range requirements {
+		requirements[i].Rating = model.RatingGood
+	}
+	requirements[0].Rating = model.RatingFair
+	partial := model.NewDashboard(model.NewDriver("aiden"), profile, requirements, now)
+	var buf bytes.Buffer
+	if err := RequirementUpdate(requirements[0], partial).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	body := buf.String()
+	for _, want := range []string{`id="ready-estimate"`, `hx-swap-oob="outerHTML"`, "Ready when every skill is rated Good"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("not-ready skill save missing %q\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "Hours and skills are met") {
+		t.Fatalf("not-ready skill save showed the ready estimate:\n%s", body)
+	}
+
+	requirements[0].Rating = model.RatingGood
+	ready := model.NewDashboard(model.NewDriver("aiden"), profile, requirements, now)
+	buf.Reset()
+	if err := RequirementUpdate(requirements[0], ready).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	body = buf.String()
+	for _, want := range []string{`id="ready-estimate"`, `hx-swap-oob="outerHTML"`, "Hours and skills are met", ">Ready<"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("ready skill save missing %q\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "Ready when every skill is rated Good") {
+		t.Fatalf("ready skill save left the old estimate:\n%s", body)
+	}
+}
+
 func TestRoadTestReadinessCardPartialAndReady(t *testing.T) {
 	now := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
 	requirements := model.DefaultRequirements(now)

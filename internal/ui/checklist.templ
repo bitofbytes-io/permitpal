@@ -73,4 +73,5 @@ templ RequirementUpdate(req model.Requirement, dashboard model.Dashboard) {
 	@RequirementRowWithMessage(req, "Saved")
 	@PracticeFocus(dashboard, true)
 	@RoadTestReadinessCard(dashboard, true)
+	@ReadyEstimateSign(dashboard, true)
 }
