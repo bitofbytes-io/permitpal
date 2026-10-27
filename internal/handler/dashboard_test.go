@@ -96,6 +96,12 @@ func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `id="whats-left"`) || !strings.Contains(rec.Body.String(), "Oct 15, 2026") {
 		t.Fatalf("body = %q, want the refreshed hold countdown", rec.Body.String())
 	}
+	// 12.5 recorded in one week credits 10, so the card uses that credit
+	// rather than 60 minus the raw total.
+	body := rec.Body.String()
+	if !strings.Contains(body, `id="road-test-readiness"`) || !strings.Contains(body, `hx-swap-oob="outerHTML"`) || !strings.Contains(body, "50.0 total hours left") || !strings.Contains(body, "8.0 night hours left") {
+		t.Fatalf("body = %q, want credited hours still left", body)
+	}
 }
 
 func TestRequirementNotesLengthLimit(t *testing.T) {

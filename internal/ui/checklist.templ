@@ -70,6 +70,7 @@ templ RequirementRowWithMessage(req model.Requirement, savedMessage string) {
 }
 
 templ RequirementUpdate(req model.Requirement, dashboard model.Dashboard) {
-@RequirementRowWithMessage(req,"Saved")
-@PracticeFocus(dashboard,true)
+	@RequirementRowWithMessage(req, "Saved")
+	@PracticeFocus(dashboard, true)
+	@RoadTestReadinessCard(dashboard, true)
 }

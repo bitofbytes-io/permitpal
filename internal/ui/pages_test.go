@@ -191,4 +191,76 @@ func TestProfileUpdateRefreshesCountdown(t *testing.T) {
 	if !strings.Contains(body, `id="whats-left"`) || !strings.Contains(body, `hx-swap-oob="outerHTML"`) {
 		t.Errorf("update missing out-of-band countdown: %s", body)
 	}
+	if !strings.Contains(body, `id="road-test-readiness"`) || strings.Count(body, `hx-swap-oob="outerHTML"`) < 2 {
+		t.Errorf("update missing out-of-band readiness card: %s", body)
+	}
+}
+
+func TestRoadTestReadinessCardPartialAndReady(t *testing.T) {
+	now := time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)
+	requirements := model.DefaultRequirements(now)
+	for i := range requirements {
+		requirements[i].Rating = model.RatingGood
+	}
+	for key, rating := range map[string]model.RequirementRating{
+		"turn-about": model.RatingNotRated,
+		"backing":    model.RatingFair,
+		"left-turns": model.RatingBad,
+		"following":  model.RatingNotRated,
+	} {
+		for i := range requirements {
+			if requirements[i].Key == key {
+				requirements[i].Rating = rating
+			}
+		}
+	}
+	partial := model.NewDashboard(model.NewDriver("aiden"), model.Profile{TotalHours: 42, NightHours: 6.5}, requirements, now)
+	var buf bytes.Buffer
+	if err := RoadTestReadinessCard(partial, false).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	body := buf.String()
+	for _, want := range []string{
+		`id="road-test-readiness"`,
+		"Road test readiness",
+		`href="#total_hours"`,
+		"18.0 total hours left",
+		`href="#night_hours"`,
+		"3.5 night hours left",
+		">Hours<",
+		">Maneuvers<",
+		`href="#requirement-turn-about"`,
+		"Turn about",
+		`href="#requirement-backing"`,
+		">Intersections<",
+		`href="#requirement-left-turns"`,
+		">General driving<",
+		`href="#requirement-following"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("partial card missing %q\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "hx-swap-oob") || strings.Contains(body, "readiness-card--ready") || strings.Contains(body, ">Ready<") || strings.Contains(body, "Quick stop") {
+		t.Fatalf("partial card should stay not-ready and omit mastered skills:\n%s", body)
+	}
+
+	readyReqs := model.DefaultRequirements(now)
+	for i := range readyReqs {
+		readyReqs[i].Rating = model.RatingGood
+	}
+	ready := model.NewDashboard(model.NewDriver("aiden"), model.Profile{TotalHours: 60, NightHours: 10}, readyReqs, now)
+	buf.Reset()
+	if err := RoadTestReadinessCard(ready, true).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	body = buf.String()
+	for _, want := range []string{`id="road-test-readiness"`, `hx-swap-oob="outerHTML"`, "readiness-card--ready", ">Ready<", "Credited hours and every skill are met."} {
+		if !strings.Contains(body, want) {
+			t.Errorf("ready card missing %q\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "hours left") || strings.Contains(body, "requirement-") || strings.Contains(body, ">Maneuvers<") {
+		t.Fatalf("ready card still lists work:\n%s", body)
+	}
 }

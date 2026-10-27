@@ -94,9 +94,11 @@ templ hoursGauge(heading, unit string, hours, required float64, percent int) {
 	</div>
 }
 
-// ProfileUpdate answers a progress save: the refreshed panel, plus the
-// countdown, which follows the permit issue date.
+// ProfileUpdate answers a progress save: the refreshed panel, the readiness
+// card (credited hours changed), and the countdown, which follows the permit
+// issue date.
 templ ProfileUpdate(dashboard model.Dashboard) {
 	@ProgressPanelWithMessage(dashboard, "Progress saved")
+	@RoadTestReadinessCard(dashboard, true)
 	@WhatsLeft(dashboard, true)
 }

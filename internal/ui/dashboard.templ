@@ -28,6 +28,7 @@ templ DashboardPage(dashboard model.Dashboard) {
 			</header>
 			<div class="app-shell">
 				<main>
+					@RoadTestReadinessCard(dashboard, false)
 					@ProgressPanel(dashboard)
 					<div class="content-grid">
 						<aside class="dashboard-side" aria-label="Progress controls">

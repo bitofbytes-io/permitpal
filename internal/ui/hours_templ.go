@@ -571,8 +571,9 @@ func hoursGauge(heading, unit string, hours, required float64, percent int) temp
 	})
 }
 
-// ProfileUpdate answers a progress save: the refreshed panel, plus the
-// countdown, which follows the permit issue date.
+// ProfileUpdate answers a progress save: the refreshed panel, the readiness
+// card (credited hours changed), and the countdown, which follows the permit
+// issue date.
 func ProfileUpdate(dashboard model.Dashboard) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -595,6 +596,10 @@ func ProfileUpdate(dashboard model.Dashboard) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = ProgressPanelWithMessage(dashboard, "Progress saved").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = RoadTestReadinessCard(dashboard, true).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

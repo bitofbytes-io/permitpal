@@ -1,0 +1,51 @@
+package ui
+
+import "github.com/drywaters/permitpal/internal/model"
+
+// RoadTestReadinessCard lists credited hours and skills still short of the
+// road test. Skill links open that skill's checklist row, where practice is
+// logged. outOfBand refreshes the card after an hours or skill save.
+templ RoadTestReadinessCard(dashboard model.Dashboard, outOfBand bool) {
+	<section
+		id="road-test-readiness"
+		class={ "readiness-card", templ.KV("readiness-card--ready", dashboard.Readiness.Ready) }
+		aria-labelledby="readiness-heading"
+		if outOfBand {
+			hx-swap-oob="outerHTML"
+		}
+	>
+		<h2 id="readiness-heading">Road test readiness</h2>
+		if dashboard.Readiness.Ready {
+			<p class="readiness-ready"><strong>Ready</strong></p>
+			<p class="readiness-note">Credited hours and every skill are met.</p>
+		} else {
+			if dashboard.Readiness.TotalHoursLeft > 0 || dashboard.Readiness.NightHoursLeft > 0 {
+				<div class="readiness-hours">
+					<h3>Hours</h3>
+					<ul>
+						if dashboard.Readiness.TotalHoursLeft > 0 {
+							<li><a href="#total_hours">{ model.FormatHours(dashboard.Readiness.TotalHoursLeft) } total hours left</a></li>
+						}
+						if dashboard.Readiness.NightHoursLeft > 0 {
+							<li><a href="#night_hours">{ model.FormatHours(dashboard.Readiness.NightHoursLeft) } night hours left</a></li>
+						}
+					</ul>
+				</div>
+			}
+			if len(dashboard.Readiness.Groups) > 0 {
+				<div class="readiness-groups">
+					for _, group := range dashboard.Readiness.Groups {
+						<div class="readiness-group">
+							<h3>{ group.Category }</h3>
+							<ul>
+								for _, req := range group.Items {
+									<li><a href={ "#requirement-" + req.Key }>{ req.Title }</a></li>
+								}
+							</ul>
+						</div>
+					}
+				</div>
+			}
+		}
+	</section>
+}
