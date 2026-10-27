@@ -89,6 +89,7 @@ type Dashboard struct {
 	PracticeFocus []Requirement
 	ReadyEstimate ReadyEstimate
 	PermitHold    PermitHold
+	Readiness     RoadTestReadiness
 	TotalPercent  int
 	NightPercent  int
 	GoodCount     int
@@ -128,6 +129,7 @@ func NewDashboard(driver Driver, profile Profile, requirements []Requirement, no
 		HourCredit:    credit,
 		WeekChart:     WeeklyCreditChart(credit, now, ChartWeeks),
 		LastDrive:     DaysSinceLastDrive(credit, now),
+		Readiness:     NewRoadTestReadiness(credit, ordered),
 	}
 }
 

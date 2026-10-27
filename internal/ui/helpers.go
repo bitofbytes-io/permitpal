@@ -50,6 +50,15 @@ func estimateLabel(waitingOn model.ReadyConstraint) string {
 	return "On pace for"
 }
 
+// estimateHint is the ready estimate's text when it has no date. Once the
+// hour and skill requirements are met, the sign agrees with the readiness card.
+func estimateHint(dashboard model.Dashboard) string {
+	if dashboard.Readiness.Ready && dashboard.ReadyEstimate.Date == nil {
+		return "Hours and skills are met"
+	}
+	return dashboard.ReadyEstimate.Hint
+}
+
 // estimateNote names the constraint that sets the ready date.
 func estimateNote(waitingOn model.ReadyConstraint) string {
 	switch waitingOn {

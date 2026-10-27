@@ -17,19 +17,7 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 		@hoursGauge("Night hours", "night hours", dashboard.Profile.NightHours, model.NightHoursRequired, dashboard.NightPercent)
 
 		<div class="estimate-sign">
-			<h2>Ready estimate</h2>
-			<div class="estimate-face">
-				<div class="calendar-icon" aria-hidden="true"></div>
-				if date := dashboard.ReadyEstimate.Date; date != nil {
-					<span>{ estimateLabel(dashboard.ReadyEstimate.WaitingOn) }</span>
-					<strong class="estimate-date">{ date.Format("January 2, 2006") }</strong>
-				} else {
-					<strong>{ dashboard.ReadyEstimate.Hint }</strong>
-				}
-			</div>
-			if note := estimateNote(dashboard.ReadyEstimate.WaitingOn); note != "" {
-				<p class="estimate-note">{ note }</p>
-			}
+			@ReadyEstimateSign(dashboard, false)
 			if savedMessage != "" {
 				<p class="save-feedback" role="status">{ savedMessage }</p>
 			}
@@ -94,9 +82,34 @@ templ hoursGauge(heading, unit string, hours, required float64, percent int) {
 	</div>
 }
 
-// ProfileUpdate answers a progress save: the refreshed panel, plus the
-// countdown, which follows the permit issue date.
+// ReadyEstimateSign is the ready-estimate copy. A skill save does not replace
+// the progress panel, so outOfBand refreshes this sign when the last unmet
+// skill changes. The progress-saved message stays outside it.
+templ ReadyEstimateSign(dashboard model.Dashboard, outOfBand bool) {
+	<div id="ready-estimate" class="ready-estimate" if outOfBand {
+		hx-swap-oob="outerHTML"
+	}>
+		<h2>Ready estimate</h2>
+		<div class="estimate-face">
+			<div class="calendar-icon" aria-hidden="true"></div>
+			if date := dashboard.ReadyEstimate.Date; date != nil {
+				<span>{ estimateLabel(dashboard.ReadyEstimate.WaitingOn) }</span>
+				<strong class="estimate-date">{ date.Format("January 2, 2006") }</strong>
+			} else {
+				<strong>{ estimateHint(dashboard) }</strong>
+			}
+		</div>
+		if note := estimateNote(dashboard.ReadyEstimate.WaitingOn); note != "" {
+			<p class="estimate-note">{ note }</p>
+		}
+	</div>
+}
+
+// ProfileUpdate answers a progress save: the refreshed panel, the readiness
+// card (credited hours changed), and the countdown, which follows the permit
+// issue date.
 templ ProfileUpdate(dashboard model.Dashboard) {
 	@ProgressPanelWithMessage(dashboard, "Progress saved")
+	@RoadTestReadinessCard(dashboard, true)
 	@WhatsLeft(dashboard, true)
 }

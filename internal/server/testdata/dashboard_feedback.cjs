@@ -394,6 +394,67 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     await page.reload();
     await page.waitForFunction(() => window.htmx);
     assert.deepEqual(await hours(), ["6.0", "2.0"], "the corrected progress did not persist");
+
+    // An hours save and a skill save both replace the readiness card. The
+    // skill save is held until the hours response has been applied, so the
+    // hours response cannot put the old skill list back afterward. The hours
+    // values are unchanged, so this save adds no journal entry.
+    const cardText = () => page.locator("#road-test-readiness").evaluate((el) => el.textContent);
+    assert.match(await cardText(), /Quick stop/);
+    assert.match(await cardText(), /54\.0 total hours left/);
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await until(() => held.length === 1);
+    const sentDuringHold = await page.evaluate(() => window.sent);
+    await other.locator("input[value=good]").check();
+    await other.locator("[name=rated_on]").fill("2025-06-01");
+    await other.getByRole("button", { name: "Update Quick stop" }).click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => window.sent), sentDuringHold, "a skill save was sent while an hours save was in flight");
+    assert.equal(held.length, 1);
+    assert.match(await cardText(), /Quick stop/);
+    for (const control of await controls(other).all()) {
+      assert.equal(await control.isDisabled(), false, "a queued skill row was disabled before its save was sent");
+    }
+    await settle(page, () => held.shift().continue(), 2);
+    assert.equal(await page.evaluate(() => window.sent), sentDuringHold + 1, "the waiting skill save was not sent after the hours save");
+    assert.equal(held.length, 0);
+    const afterOverlap = await cardText();
+    assert.doesNotMatch(afterOverlap, /Quick stop/);
+    assert.match(afterOverlap, /54\.0 total hours left/);
+    assert.match(afterOverlap, /8\.0 night hours left/);
+    assert.match(afterOverlap, /Use of lane/);
+    assert.deepEqual(await statuses(other), ["Saved"]);
+    await page.unrouteAll();
+
+    // A queued hours save is edited invalid before it starts, with another
+    // skill save behind it. The invalid save must not keep that skill save
+    // queued forever. A second click on the waiting hours form is dropped.
+    held = [];
+    await page.route("**/requirements/backing", (route) => {
+      held.push(route);
+    });
+    const backing = page.locator("#requirement-backing");
+    await backing.locator("input[value=fair]").check();
+    await backing.locator("[name=rated_on]").fill("2025-07-01");
+    await backing.getByRole("button", { name: "Update Backing" }).click();
+    await until(() => held.length === 1);
+    const sentBeforeQueue = await page.evaluate(() => window.sent);
+    await page.locator("#total_hours").fill("7");
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await page.locator("#total_hours").fill("1000.1");
+    const following = page.locator("#requirement-following");
+    await following.locator("input[value=fair]").check();
+    await following.locator("[name=rated_on]").fill("2025-07-02");
+    await following.getByRole("button", { name: "Update Following" }).click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => window.sent), sentBeforeQueue, "a queued save was sent while another save was in flight");
+    await settle(page, () => held.shift().continue(), 2);
+    assert.equal(await page.evaluate(() => window.sent), sentBeforeQueue + 1, "a save behind a halted request stayed queued");
+    assert.equal(held.length, 0);
+    assert.deepEqual(await statuses(following), ["Saved"]);
+    assert.equal(await page.locator("#total_hours").inputValue(), "1000.1");
+    await page.locator("#total_hours").fill("6");
     await page.unrouteAll();
 
     // Cumulative inputs stay unchanged while the separate entry-week credit
