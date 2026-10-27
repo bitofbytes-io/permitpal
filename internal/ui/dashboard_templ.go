@@ -210,7 +210,7 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">\n\t\t\t\t// htmx does not swap error responses, so show a rejected save's plain-text\n\t\t\t\t// message in the form that sent it. The clear-rating button's requests\n\t\t\t\t// belong to its row. Each form sends one save at a time (hx-sync and\n\t\t\t\t// hx-disabled-elt on the form), so saves from a form never overlap or\n\t\t\t\t// queue behind each other.\n\t\t\t\t(function () {\n\t\t\t\t\tvar forms = \"#progress-form, .checklist-row\";\n\n\t\t\t\t\tfunction clearFeedback(form) {\n\t\t\t\t\t\tvar error = form.querySelector(\".form-error\");\n\t\t\t\t\t\terror.hidden = true;\n\t\t\t\t\t\terror.textContent = \"\";\n\t\t\t\t\t\tif (form.id === \"progress-form\") {\n\t\t\t\t\t\t\tvar progressSaved = document.querySelector(\"#progress-panel .save-feedback\");\n\t\t\t\t\t\t\tif (progressSaved) {\n\t\t\t\t\t\t\t\tprogressSaved.remove();\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar rowSaved = form.querySelector(\".row-save-feedback\");\n\t\t\t\t\t\tif (rowSaved) {\n\t\t\t\t\t\t\tvar ok = document.createElement(\"span\");\n\t\t\t\t\t\t\tok.textContent = \"OK\";\n\t\t\t\t\t\t\trowSaved.replaceWith(ok);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener(\"htmx:beforeRequest\", function (event) {\n\t\t\t\t\t\tvar form = event.detail.elt.closest(forms);\n\t\t\t\t\t\tif (!form) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar xhr = event.detail.xhr;\n\t\t\t\t\t\tclearFeedback(form);\n\t\t\t\t\t\t// htmx handles the response first: it swaps the row on success and\n\t\t\t\t\t\t// re-enables a rejected row's controls.\n\t\t\t\t\t\txhr.addEventListener(\"load\", function () {\n\t\t\t\t\t\t\tif (xhr.status !== 400) {\n\t\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tvar error = form.querySelector(\".form-error\");\n\t\t\t\t\t\t\terror.textContent = xhr.responseText.trim();\n\t\t\t\t\t\t\terror.hidden = error.textContent === \"\";\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t})();\n\n\t\t\t\t// Recently mastered hides skills that are still in practice and\n\t\t\t\t// orders the rest by sign-off date, newest first. Sheet order is\n\t\t\t\t// the numbered road-test order. A saved row is swapped in place,\n\t\t\t\t// so the selected view is applied again after htmx settles.\n\t\t\t\t(function () {\n\t\t\t\t\tvar table = document.querySelector(\".checklist-table\");\n\t\t\t\t\tvar buttons = document.querySelectorAll(\"[data-checklist-view]\");\n\t\t\t\t\tvar empty = document.getElementById(\"checklist-empty\");\n\t\t\t\t\tif (!table || buttons.length === 0) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction rows() {\n\t\t\t\t\t\treturn Array.prototype.slice.call(table.querySelectorAll(\".checklist-row\"));\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction apply(view) {\n\t\t\t\t\t\tvar list = rows();\n\t\t\t\t\t\tlist.sort(function (a, b) {\n\t\t\t\t\t\t\tif (view === \"recent\") {\n\t\t\t\t\t\t\t\tvar am = a.getAttribute(\"data-mastered\") || \"\";\n\t\t\t\t\t\t\t\tvar bm = b.getAttribute(\"data-mastered\") || \"\";\n\t\t\t\t\t\t\t\tif (am !== bm) {\n\t\t\t\t\t\t\t\t\treturn bm.localeCompare(am);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\treturn Number(a.getAttribute(\"data-order\")) - Number(b.getAttribute(\"data-order\"));\n\t\t\t\t\t\t});\n\t\t\t\t\t\tvar visible = 0;\n\t\t\t\t\t\tlist.forEach(function (row) {\n\t\t\t\t\t\t\tvar show = view !== \"recent\" || row.hasAttribute(\"data-mastered\");\n\t\t\t\t\t\t\trow.hidden = !show;\n\t\t\t\t\t\t\tif (show) {\n\t\t\t\t\t\t\t\tvisible++;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\ttable.appendChild(row);\n\t\t\t\t\t\t});\n\t\t\t\t\t\tif (empty) {\n\t\t\t\t\t\t\tempty.hidden = view !== \"recent\" || visible !== 0;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tArray.prototype.forEach.call(buttons, function (button) {\n\t\t\t\t\t\t\tvar on = button.getAttribute(\"data-checklist-view\") === view;\n\t\t\t\t\t\t\tbutton.classList.toggle(\"is-selected\", on);\n\t\t\t\t\t\t\tbutton.setAttribute(\"aria-pressed\", on ? \"true\" : \"false\");\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\tArray.prototype.forEach.call(buttons, function (button) {\n\t\t\t\t\t\tbutton.addEventListener(\"click\", function () {\n\t\t\t\t\t\t\tapply(button.getAttribute(\"data-checklist-view\"));\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"htmx:afterSwap\", function () {\n\t\t\t\t\t\tvar selected = document.querySelector(\"[data-checklist-view].is-selected\");\n\t\t\t\t\t\tif (selected) {\n\t\t\t\t\t\t\tapply(selected.getAttribute(\"data-checklist-view\"));\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">\n\t\t\t\t// htmx does not swap error responses, so show a rejected save's plain-text\n\t\t\t\t// message in the form that sent it. The clear-rating button's requests\n\t\t\t\t// belong to its row. Each form sends one save at a time (hx-sync and\n\t\t\t\t// hx-disabled-elt on the form), so saves from a form never overlap or\n\t\t\t\t// queue behind each other.\n\t\t\t\t(function () {\n\t\t\t\t\tvar forms = \"#progress-form, .checklist-row\";\n\n\t\t\t\t\tfunction clearFeedback(form) {\n\t\t\t\t\t\tvar error = form.querySelector(\".form-error\");\n\t\t\t\t\t\terror.hidden = true;\n\t\t\t\t\t\terror.textContent = \"\";\n\t\t\t\t\t\tif (form.id === \"progress-form\") {\n\t\t\t\t\t\t\tvar progressSaved = document.querySelector(\"#progress-panel .save-feedback\");\n\t\t\t\t\t\t\tif (progressSaved) {\n\t\t\t\t\t\t\t\tprogressSaved.remove();\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar rowSaved = form.querySelector(\".row-save-feedback\");\n\t\t\t\t\t\tif (rowSaved) {\n\t\t\t\t\t\t\tvar ok = document.createElement(\"span\");\n\t\t\t\t\t\t\tok.textContent = \"OK\";\n\t\t\t\t\t\t\trowSaved.replaceWith(ok);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener(\"htmx:beforeRequest\", function (event) {\n\t\t\t\t\t\tvar form = event.detail.elt.closest(forms);\n\t\t\t\t\t\tif (!form) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar xhr = event.detail.xhr;\n\t\t\t\t\t\tclearFeedback(form);\n\t\t\t\t\t\t// htmx handles the response first: it swaps the row on success and\n\t\t\t\t\t\t// re-enables a rejected row's controls.\n\t\t\t\t\t\txhr.addEventListener(\"load\", function () {\n\t\t\t\t\t\t\tif (xhr.status !== 400) {\n\t\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tvar error = form.querySelector(\".form-error\");\n\t\t\t\t\t\t\terror.textContent = xhr.responseText.trim();\n\t\t\t\t\t\t\terror.hidden = error.textContent === \"\";\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t})();\n\n\t\t\t\t// Recently mastered hides skills that are still in practice and\n\t\t\t\t// orders the rest by sign-off date, newest first. Sheet order is\n\t\t\t\t// the numbered road-test order. Only a checklist swap refreshes\n\t\t\t\t// the view, and rows move only when that order changed, so a save\n\t\t\t\t// does not steal focus from another skill.\n\t\t\t\t(function () {\n\t\t\t\t\tvar table = document.querySelector(\".checklist-table\");\n\t\t\t\t\tvar buttons = document.querySelectorAll(\"[data-checklist-view]\");\n\t\t\t\t\tvar empty = document.getElementById(\"checklist-empty\");\n\t\t\t\t\tif (!table || buttons.length === 0) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction rows() {\n\t\t\t\t\t\treturn Array.prototype.slice.call(table.querySelectorAll(\".checklist-row\"));\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction masteredLabel(value) {\n\t\t\t\t\t\tvar match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value);\n\t\t\t\t\t\tif (!match) {\n\t\t\t\t\t\t\treturn \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar year = Number(match[1]);\n\t\t\t\t\t\tvar month = Number(match[2]);\n\t\t\t\t\t\tvar day = Number(match[3]);\n\t\t\t\t\t\tvar date = new Date(year, month - 1, day);\n\t\t\t\t\t\tif (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {\n\t\t\t\t\t\t\treturn \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn \"Mastered \" + date.toLocaleDateString(\"en-US\", { month: \"short\", day: \"numeric\", year: \"numeric\" });\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction showEditedDate(input) {\n\t\t\t\t\t\tvar text = input.parentNode && input.parentNode.querySelector(\".mastered-status-text\");\n\t\t\t\t\t\tif (!text) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar label = masteredLabel(input.value);\n\t\t\t\t\t\ttext.textContent = label;\n\t\t\t\t\t\tinput.setAttribute(\"aria-label\", label || \"Mastered date\");\n\t\t\t\t\t}\n\n\t\t\t\t\ttable.addEventListener(\"input\", function (event) {\n\t\t\t\t\t\tif (event.target && event.target.name === \"rated_on\") {\n\t\t\t\t\t\t\tshowEditedDate(event.target);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\ttable.addEventListener(\"change\", function (event) {\n\t\t\t\t\t\tif (event.target && event.target.name === \"rated_on\") {\n\t\t\t\t\t\t\tshowEditedDate(event.target);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tfunction apply(view) {\n\t\t\t\t\t\tvar list = rows();\n\t\t\t\t\t\tvar sorted = list.slice().sort(function (a, b) {\n\t\t\t\t\t\t\tif (view === \"recent\") {\n\t\t\t\t\t\t\t\tvar am = a.getAttribute(\"data-mastered\") || \"\";\n\t\t\t\t\t\t\t\tvar bm = b.getAttribute(\"data-mastered\") || \"\";\n\t\t\t\t\t\t\t\tif (am !== bm) {\n\t\t\t\t\t\t\t\t\treturn bm.localeCompare(am);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\treturn Number(a.getAttribute(\"data-order\")) - Number(b.getAttribute(\"data-order\"));\n\t\t\t\t\t\t});\n\t\t\t\t\t\tvar visible = 0;\n\t\t\t\t\t\tsorted.forEach(function (row) {\n\t\t\t\t\t\t\tvar show = view !== \"recent\" || row.hasAttribute(\"data-mastered\");\n\t\t\t\t\t\t\trow.hidden = !show;\n\t\t\t\t\t\t\tif (show) {\n\t\t\t\t\t\t\t\tvisible++;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t\tvar sameOrder = list.length === sorted.length;\n\t\t\t\t\t\tfor (var i = 0; sameOrder && i < sorted.length; i++) {\n\t\t\t\t\t\t\tif (list[i] !== sorted[i]) {\n\t\t\t\t\t\t\t\tsameOrder = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (!sameOrder) {\n\t\t\t\t\t\t\tvar focus = document.activeElement;\n\t\t\t\t\t\t\tvar range = null;\n\t\t\t\t\t\t\tif (focus && typeof focus.selectionStart === \"number\") {\n\t\t\t\t\t\t\t\trange = { start: focus.selectionStart, end: focus.selectionEnd };\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tsorted.forEach(function (row) {\n\t\t\t\t\t\t\t\ttable.appendChild(row);\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\tif (focus && document.contains(focus) && typeof focus.focus === \"function\") {\n\t\t\t\t\t\t\t\tfocus.focus();\n\t\t\t\t\t\t\t\tif (range && typeof focus.setSelectionRange === \"function\") {\n\t\t\t\t\t\t\t\t\tfocus.setSelectionRange(range.start, range.end);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (empty) {\n\t\t\t\t\t\t\tempty.hidden = view !== \"recent\" || visible !== 0;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tArray.prototype.forEach.call(buttons, function (button) {\n\t\t\t\t\t\t\tvar on = button.getAttribute(\"data-checklist-view\") === view;\n\t\t\t\t\t\t\tbutton.classList.toggle(\"is-selected\", on);\n\t\t\t\t\t\t\tbutton.setAttribute(\"aria-pressed\", on ? \"true\" : \"false\");\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\tArray.prototype.forEach.call(buttons, function (button) {\n\t\t\t\t\t\tbutton.addEventListener(\"click\", function () {\n\t\t\t\t\t\t\tapply(button.getAttribute(\"data-checklist-view\"));\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"htmx:afterSwap\", function (event) {\n\t\t\t\t\t\tvar detail = event.detail || {};\n\t\t\t\t\t\tvar target = detail.target;\n\t\t\t\t\t\tvar elt = detail.elt;\n\t\t\t\t\t\tvar inChecklist = target && target.closest && (target.closest(\".checklist-table\") || target.classList.contains(\"checklist-table\"));\n\t\t\t\t\t\tvar fromRow = elt && elt.closest && elt.closest(\".checklist-row\");\n\t\t\t\t\t\tif (!inChecklist && !fromRow) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar selected = document.querySelector(\"[data-checklist-view].is-selected\");\n\t\t\t\t\t\tif (selected) {\n\t\t\t\t\t\t\tapply(selected.getAttribute(\"data-checklist-view\"));\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -261,7 +261,7 @@ func PracticeFocus(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(req.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 223, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 289, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -325,7 +325,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(model.MinPermitHoldMonths))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 243, Col: 118}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 309, Col: 118}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -343,7 +343,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(hold.DaysLeft))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 245, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 311, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -356,7 +356,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(daysWord(hold.DaysLeft))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 245, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 311, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -369,7 +369,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(model.MinPermitHoldMonths))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 246, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 312, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -382,7 +382,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(model.DisplayDate(hold.Ends))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 246, Col: 122}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 312, Col: 122}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -400,7 +400,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(model.MinPermitHoldMonths))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 249, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 315, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -413,7 +413,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(model.DisplayDate(hold.Ends))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 249, Col: 123}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 315, Col: 123}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -436,7 +436,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(step.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 254, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 320, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -449,7 +449,7 @@ func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(step.Detail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 255, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 321, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
