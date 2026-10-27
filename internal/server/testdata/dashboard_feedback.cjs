@@ -394,6 +394,36 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     await page.reload();
     await page.waitForFunction(() => window.htmx);
     assert.deepEqual(await hours(), ["6.0", "2.0"], "the corrected progress did not persist");
+
+    // An hours save and a skill save both replace the readiness card. The
+    // skill save is held until the hours response has been applied, so the
+    // hours response cannot put the old skill list back afterward. The hours
+    // values are unchanged, so this save adds no journal entry.
+    const cardText = () => page.locator("#road-test-readiness").evaluate((el) => el.textContent);
+    assert.match(await cardText(), /Quick stop/);
+    assert.match(await cardText(), /54\.0 total hours left/);
+    await progressForm.getByRole("button", { name: "Save progress" }).click();
+    await until(() => held.length === 1);
+    const sentDuringHold = await page.evaluate(() => window.sent);
+    await other.locator("input[value=good]").check();
+    await other.locator("[name=rated_on]").fill("2025-06-01");
+    await other.getByRole("button", { name: "Update Quick stop" }).click();
+    await page.waitForTimeout(200);
+    assert.equal(await page.evaluate(() => window.sent), sentDuringHold, "a skill save was sent while an hours save was in flight");
+    assert.equal(held.length, 1);
+    assert.match(await cardText(), /Quick stop/);
+    for (const control of await controls(other).all()) {
+      assert.equal(await control.isDisabled(), false, "a queued skill row was disabled before its save was sent");
+    }
+    await settle(page, () => held.shift().continue(), 2);
+    assert.equal(await page.evaluate(() => window.sent), sentDuringHold + 1, "the waiting skill save was not sent after the hours save");
+    assert.equal(held.length, 0);
+    const afterOverlap = await cardText();
+    assert.doesNotMatch(afterOverlap, /Quick stop/);
+    assert.match(afterOverlap, /54\.0 total hours left/);
+    assert.match(afterOverlap, /8\.0 night hours left/);
+    assert.match(afterOverlap, /Use of lane/);
+    assert.deepEqual(await statuses(other), ["Saved"]);
     await page.unrouteAll();
 
     // Cumulative inputs stay unchanged while the separate entry-week credit

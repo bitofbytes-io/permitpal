@@ -100,10 +100,26 @@ templ DashboardPage(dashboard model.Dashboard) {
 				// htmx does not swap error responses, so show a rejected save's plain-text
 				// message in the form that sent it. The clear-rating button's requests
 				// belong to its row. Each form sends one save at a time (hx-sync and
-				// hx-disabled-elt on the form), so saves from a form never overlap or
-				// queue behind each other.
+				// hx-disabled-elt on the form), so a second save from the same form is
+				// dropped rather than queued. Hours and skill responses both replace
+				// the readiness card, so a save from another form waits until the one
+				// in flight has been applied. An older response then cannot overwrite
+				// a newer change.
 				(function () {
 					var forms = "#progress-form, .checklist-row";
+					var inflight = new Set();
+					var waiting = [];
+
+					function saveForm(elt) {
+						return elt && elt.closest ? elt.closest(forms) : null;
+					}
+
+					function releaseNext() {
+						if (inflight.size > 0 || waiting.length === 0) {
+							return;
+						}
+						waiting.shift()(true);
+					}
 
 					function clearFeedback(form) {
 						var error = form.querySelector(".form-error");
@@ -124,10 +140,33 @@ templ DashboardPage(dashboard model.Dashboard) {
 						}
 					}
 
+					// Confirm runs before hx-sync. A same-form repeat is left for
+					// hx-sync to drop. A different form is held and issued only
+					// after the in-flight save's response has been applied.
+					document.addEventListener("htmx:confirm", function (event) {
+						var form = saveForm(event.detail.elt);
+						if (!form || inflight.has(form) || (inflight.size === 0 && waiting.length === 0)) {
+							return;
+						}
+						event.preventDefault();
+						waiting.push(event.detail.issueRequest);
+					});
+
 					document.addEventListener("htmx:beforeRequest", function (event) {
-						var form = event.detail.elt.closest(forms);
+						var form = saveForm(event.detail.elt);
 						if (!form) {
 							return;
+						}
+						if (!inflight.has(form)) {
+							inflight.add(form);
+							// The listener sits on the form that issued the save. htmx
+							// swaps a skill row out of the document before afterRequest,
+							// and a detached node does not bubble to document.
+							form.addEventListener("htmx:afterRequest", function onDone() {
+								form.removeEventListener("htmx:afterRequest", onDone);
+								inflight.delete(form);
+								releaseNext();
+							});
 						}
 						var xhr = event.detail.xhr;
 						clearFeedback(form);
