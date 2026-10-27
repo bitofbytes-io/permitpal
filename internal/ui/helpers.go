@@ -55,6 +55,13 @@ func daysWord(days int) string {
 	return "days"
 }
 
+func driveNudgeClass(stale bool) string {
+	if stale {
+		return "drive-nudge drive-nudge--stale"
+	}
+	return "drive-nudge"
+}
+
 func odometerChars(value float64) []string {
 	formatted := fmt.Sprintf("%04.1f", value)
 	chars := make([]string, 0, len(formatted))

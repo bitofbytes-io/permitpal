@@ -45,6 +45,63 @@ type HourCredit struct {
 	LastRecordedOn             *time.Time
 }
 
+// LastDriveHighlightAfterDays is the longest quiet gap. The dashboard
+// highlights the nudge only once more than this many calendar days have
+// passed since the latest dated hour entry.
+const LastDriveHighlightAfterDays = 7
+
+// LastDrive is the days since the latest dated hour entry and the credit
+// still open in today's Monday–Sunday week. Dated is false for an empty
+// journal and for undated opening hours. RemainingHours is WeeklyHourCap
+// minus this week's already-credited total from HourCredit.
+type LastDrive struct {
+	Dated          bool
+	Days           int
+	RecordedOn     *time.Time
+	RemainingHours float64
+	Stale          bool
+}
+
+// DaysSinceLastDrive measures the calendar-day gap from today back to
+// credit.LastRecordedOn. A gap of LastDriveHighlightAfterDays stays quiet;
+// a longer gap is Stale. An entry dated after today counts as zero days and
+// is not stale. Remaining credit reuses the capped weekly totals: other
+// weeks and undated hours do not spend this week's cap.
+func DaysSinceLastDrive(credit HourCredit, today time.Time) LastDrive {
+	drive := LastDrive{RemainingHours: remainingWeekCredit(credit, today)}
+	if credit.LastRecordedOn == nil || credit.LastRecordedOn.IsZero() {
+		return drive
+	}
+	on := startOfDay(*credit.LastRecordedOn)
+	days := int(startOfDay(today).Sub(on).Hours() / 24)
+	if days < 0 {
+		days = 0
+	}
+	drive.Dated = true
+	drive.Days = days
+	drive.RecordedOn = &on
+	drive.Stale = days > LastDriveHighlightAfterDays
+	return drive
+}
+
+// remainingWeekCredit is the cap minus the credited total HourCredit already
+// assigned to today's ISO week. It does not replay hour lots.
+func remainingWeekCredit(credit HourCredit, today time.Time) float64 {
+	week := isoWeekStart(today)
+	creditedTenths := 0
+	for _, entry := range credit.Weeks {
+		if entry.Starts.Equal(week) {
+			creditedTenths = hourTenths(entry.TotalHours)
+			break
+		}
+	}
+	remaining := WeeklyHourCap*10 - creditedTenths
+	if remaining < 0 {
+		return 0
+	}
+	return float64(remaining) / 10
+}
+
 // CreditHours replays day and night independently. A correction removes the
 // newest matching hours first, then the undated opening balance. Reclassifying
 // day to night therefore records the newly classified night hours today.
