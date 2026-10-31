@@ -4,7 +4,7 @@ go 1.26.10
 
 require (
 	github.com/a-h/templ v0.3.1001
-	github.com/go-chi/chi/v5 v5.3.0
+	github.com/go-chi/chi/v5 v5.4.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/prometheus/client_golang v1.25.0
 	golang.org/x/crypto v0.57.0
