@@ -4,6 +4,10 @@ on:
   push:
     branches: [ main ]
   pull_request:
+  # Renovate follow-up commits are pushed with the workflow token, which does
+  # not start pull_request runs. renovate-templ.yml dispatches this workflow
+  # so those commits are tested. Dispatch works once this trigger is on main.
+  workflow_dispatch:
 
 jobs:
   test:

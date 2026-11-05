@@ -1,0 +1,64 @@
+name: Regenerate templ on Renovate branches
+
+# Mend-hosted Renovate does not run postUpgradeTasks, so it cannot generate
+# templ output before go mod tidy. Its go get also records only go.mod
+# checksums for modules imported by the templ tool, which makes
+# `make check-generated` fail. This workflow completes those sums, regenerates
+# the tracked *_templ.go files, tidies again, and commits the result.
+
+on:
+  push:
+    branches:
+      - renovate/**
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.ref_name }}
+          persist-credentials: true
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Regenerate templ and tidy modules
+        run: |
+          set -euo pipefail
+          # Tidy before generate so the templ tool's module zips are in go.sum.
+          # Generate next, then tidy again so imports added by the new output
+          # are recorded.
+          go mod tidy
+          go tool templ generate
+          go mod tidy
+
+      - name: Commit updates
+        id: commit
+        run: |
+          set -euo pipefail
+          git add -- go.mod go.sum
+          git add -- ':(glob)**/*_templ.go'
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: regenerate templ output after dependency update"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Run CI on the updated commit
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run ci.yml --ref "${GITHUB_REF_NAME}"
