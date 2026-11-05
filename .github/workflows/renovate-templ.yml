@@ -100,21 +100,12 @@ jobs:
         run: |
           set -euo pipefail
           patch="${RUNNER_TEMP}/templ-update/changes.patch"
-          mapfile -t paths < <(git apply --numstat "$patch" | awk -F '\t' '{print $3}')
-          if [ "${#paths[@]}" -eq 0 ]; then
-            echo "Generated diff is empty" >&2
-            exit 1
-          fi
-          for path in "${paths[@]}"; do
-            case "$path" in
-              go.mod|go.sum|*_templ.go) ;;
-              *)
-                echo "Patch touches unexpected path: ${path}" >&2
-                exit 1
-                ;;
-            esac
-          done
+          # Copy the checker before apply so a patch cannot replace the script
+          # that is about to run.
+          checker="${RUNNER_TEMP}/check-staged-templ-update.sh"
+          cp test-support/check-staged-templ-update.sh "${checker}"
           git apply --index --binary "$patch"
+          bash "${checker}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: regenerate templ output after dependency update"
