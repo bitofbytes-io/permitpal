@@ -59,8 +59,8 @@ build: templ ## Build the production binary
 	mkdir -p $(BIN_DIR)
 	go build -o $(BIN_DIR)/permitpal ./cmd/permitpal
 
-test: templ ## Run Go tests
-	go test ./...
+test: templ ## Run Go tests with the race detector
+	go test -race ./...
 
 migrate: ## Apply Postgres migrations with goose
 	@test -n '$(DATABASE_URL)' || (echo "DATABASE_URL must be set in local.mk or the environment" >&2; exit 1)

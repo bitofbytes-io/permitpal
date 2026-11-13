@@ -154,11 +154,12 @@ Migration 003 can be reversed on a scratch database with `make migrate-down` the
 ```bash
 make check-generated
 make lint
-make test
-PERMITPAL_TEST_DATABASE_URL='postgres://user:password@localhost/permitpal_test?sslmode=disable' go test -race ./internal/...
+PERMITPAL_TEST_DATABASE_URL='postgres://user:password@localhost/permitpal_test?sslmode=disable' make test
 go vet ./...
 make build
 ```
+
+`make test` runs the whole suite once with the race detector, so it needs cgo and a C compiler. Set `PERMITPAL_TEST_DATABASE_URL` to a disposable database to include the Postgres tests; without it they are skipped.
 
 `make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs staticcheck. Staticcheck is pinned as a Go tool dependency in `go.mod`, so no global installation is needed and Renovate can track its version. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
 

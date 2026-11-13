@@ -43,7 +43,6 @@ jobs:
       - name: Check Go formatting and static analysis
         run: make lint
       - run: make test
-      - run: go test -race ./...
       - run: go vet ./...
       - name: Check Go vulnerabilities
         # Install, then run it with the go.mod toolchain so standard-library findings match
