@@ -1,0 +1,28 @@
+package ui
+
+import "github.com/drywaters/permitpal/internal/model"
+
+// PracticeFocus lists the skills to work on next. outOfBand refreshes the
+// panel after a skill save.
+templ PracticeFocus(dashboard model.Dashboard, outOfBand bool) {
+	<section
+		id="practice-focus"
+		class="side-panel practice-panel"
+		if outOfBand {
+			hx-swap-oob="outerHTML"
+		}
+	>
+		<div class="practice-heading">
+			<span class="traffic-cone-icon" aria-hidden="true"></span>
+			<div>
+				<h2>Practice focus</h2>
+			</div>
+		</div>
+		<ol>
+			for _, req := range dashboard.PracticeFocus {
+				<li>{ req.Title }</li>
+			}
+		</ol>
+		<p class="practice-note">Focus on these skills during your next few drives.</p>
+	</section>
+}

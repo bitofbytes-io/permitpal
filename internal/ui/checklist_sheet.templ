@@ -1,0 +1,38 @@
+package ui
+
+import "github.com/drywaters/permitpal/internal/model"
+
+// ChecklistSheet is the clipboard of road-test skills with its order toggle.
+// Rows live in checklist.templ and the toggle script in dashboard_scripts.templ.
+templ ChecklistSheet(dashboard model.Dashboard) {
+							<div class="clipboard-shell">
+	<div class="clipboard-clip" aria-hidden="true"></div>
+	<div class="sheet-title">
+		<h1 id="checklist-heading">Road Test Skill Checklist</h1>
+	</div>
+	<div class="checklist-toolbar" role="group" aria-label="Checklist order">
+		<button type="button" class="is-selected" data-checklist-view="sheet" aria-pressed="true">All skills</button>
+		<button type="button" data-checklist-view="recent" aria-pressed="false">Recently mastered</button>
+	</div>
+	<p id="checklist-empty" class="checklist-empty" hidden>No skills are mastered yet.</p>
+	<div class="checklist-table" aria-label="Driving skills">
+		<div class="checklist-head" role="row">
+			<span>#</span>
+			<span>Skill</span>
+			<span>Bad</span>
+<span>Fair</span>
+		<span>Good</span>
+		<span>Last rated</span>
+		<span>Notes</span>
+		<span class="save-column">OK</span>
+		</div>
+		for _, req := range dashboard.Requirements {
+			@RequirementRow(req)
+		}
+	</div>
+	<div class="checklist-reference">
+		<span>Skills from the NCDMV Level 2 road test score sheet.</span>
+		<a href="https://www.ncdot.gov/dmv/license-id/driver-licenses/new-drivers/Pages/level2.aspx" target="_blank" rel="noopener noreferrer">Learn more</a>
+	</div>
+							</div>
+}
