@@ -47,7 +47,7 @@ func (s *PostgresStore) UpdateProfile(ctx context.Context, driverID int64, profi
 	if err != nil {
 		return model.Profile{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit
 	var previous model.Profile
 	err = tx.QueryRow(ctx, `select total_hours,night_hours from app_profile where driver_id=$1 for update`, driverID).Scan(&previous.TotalHours, &previous.NightHours)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -108,7 +108,7 @@ func (s *PostgresStore) getProfile(ctx context.Context, driverID int64) (model.P
 	if err != nil {
 		return model.Profile{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit
 	var profile model.Profile
 	err = tx.QueryRow(ctx, `select permit_issue_date,total_hours,night_hours,updated_at from app_profile where driver_id=$1`, driverID).Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -186,7 +186,7 @@ func (s *PostgresStore) EnsureDriver(ctx context.Context, username string, now t
 	if err != nil {
 		return model.Driver{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit
 	driver := model.NewDriver(username)
 	err = tx.QueryRow(ctx, `insert into drivers (username,display_name,created_at) values ($1,$2,$3) on conflict (username) do nothing returning id`, username, driver.DisplayName, now).Scan(&driver.ID)
 	created := err == nil

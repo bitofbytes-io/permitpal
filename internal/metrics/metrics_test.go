@@ -174,7 +174,7 @@ func TestStartDisabledOrUnavailableReturnsNil(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer taken.Close()
+	defer func() { _ = taken.Close() }()
 	srv := Start(taken.Addr().String(), NewRegistry())
 	if srv != nil {
 		t.Fatal("Start on a bound address returned a server")

@@ -111,7 +111,9 @@ func TestHourEntriesStorageParity(t *testing.T) {
 				t.Fatalf("other driver changed: %+v %v", untouched, err)
 			}
 			// Fresh store instance retains every entry in Postgres; another login never resets it.
-			store.EnsureDriver(ctx, driver.Username, sunday)
+			if _, err := store.EnsureDriver(ctx, driver.Username, sunday); err != nil {
+				t.Fatal(err)
+			}
 			if !reflect.DeepEqual(after.Profile.HourEntries, tracker().Profile.HourEntries) {
 				t.Fatal("login changed journal")
 			}

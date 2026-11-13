@@ -130,7 +130,7 @@ func freePort(t *testing.T, addr string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	_, port, err := net.SplitHostPort(ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +151,7 @@ func waitForOK(t *testing.T, finished <-chan struct{}, url string) {
 		}
 		resp, err := client.Get(url)
 		if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				return
 			}
