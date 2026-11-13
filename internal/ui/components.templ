@@ -7,6 +7,9 @@ templ pageHead(title string) {
 		<meta name="viewport" content="width=device-width, initial-scale=1"/>
 		<title>{ title }</title>
 		<link rel="icon" href="/static/assets/permitpal-logo-mark.png"/>
+		<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png"/>
+		<link rel="manifest" href="/static/site.webmanifest"/>
+		<meta name="theme-color" content="#22323d"/>
 		<link rel="stylesheet" href="/static/styles.css"/>
 		{ children... }
 		@UmamiScript()

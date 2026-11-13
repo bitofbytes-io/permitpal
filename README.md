@@ -67,6 +67,10 @@ Failed logins are limited to 20 per username and, when the real client IP is kno
 
 Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
 
+## Install to the home screen
+
+Every page links a web app manifest (`static/site.webmanifest`), a theme color, and an `apple-touch-icon`, so Chrome offers to install PermitPal and iOS Safari uses the icon for "Add to Home Screen". The manifest and its 192, 512, and maskable 512 icons (`static/icons/`) are static files served by the existing `/static/` handler with no login, because browsers fetch the manifest without credentials. The `.webmanifest` extension is registered as `application/manifest+json` in the binary. No configuration is needed. Installation needs HTTPS, which production already uses; `http://localhost` also qualifies in development.
+
 ## Database and migrations
 
 ```bash

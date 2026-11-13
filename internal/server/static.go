@@ -2,8 +2,17 @@ package server
 
 import (
 	"io/fs"
+	"mime"
 	"net/http"
 )
+
+// Go's built-in table has no .webmanifest entry and falls back to the host's
+// mime.types, which the image may not have.
+func init() {
+	if err := mime.AddExtensionType(".webmanifest", "application/manifest+json"); err != nil {
+		panic(err)
+	}
+}
 
 // filesOnly serves files but reports directories as missing, so /static/
 // and its subdirectories do not list their contents.
