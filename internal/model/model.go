@@ -2,8 +2,6 @@ package model
 
 import (
 	"fmt"
-	"math"
-	"sort"
 	"strings"
 	"time"
 )
@@ -23,21 +21,6 @@ const (
 	WeeklyHourCap = 10
 	// ChartWeeks is how many recent Monday–Sunday entry weeks the dashboard chart shows.
 	ChartWeeks = 12
-)
-
-// North Carolina jurisdiction copy used by the road-test checklist.
-const (
-	level2LicenseAgeDetail = "The minimum age for a Level 2 license."
-	dmvInsuranceDetail     = "Bring proof of liability insurance to the DMV."
-)
-
-type RequirementRating string
-
-const (
-	RatingNotRated RequirementRating = "not_rated"
-	RatingGood     RequirementRating = "good"
-	RatingBad      RequirementRating = "bad"
-	RatingFair     RequirementRating = "fair"
 )
 
 type Driver struct {
@@ -65,234 +48,17 @@ type Profile struct {
 	HourEntries     []HourEntry
 }
 
-type Requirement struct {
-	Key         string
-	Title       string
-	Description string
-	Rating      RequirementRating
-	RatedOn     *time.Time
-	Notes       string
-	SortOrder   int
-	UpdatedAt   time.Time
-}
-
 // Tracker is one driver's stored progress: hours, permit date and skill ratings.
 type Tracker struct {
 	Profile      Profile
 	Requirements []Requirement
 }
 
-type Dashboard struct {
-	Driver        Driver
-	Profile       Profile
-	Requirements  []Requirement
-	PracticeFocus []Requirement
-	ReadyEstimate ReadyEstimate
-	PermitHold    PermitHold
-	Readiness     RoadTestReadiness
-	TotalPercent  int
-	NightPercent  int
-	GoodCount     int
-	HourCredit    HourCredit
-	WeekChart     WeekCreditChart
-	LastDrive     LastDrive
-}
-
-func NewDashboard(driver Driver, profile Profile, requirements []Requirement, now time.Time) Dashboard {
-	ordered := append([]Requirement(nil), requirements...)
-	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].SortOrder < ordered[j].SortOrder })
-	good := 0
-	for _, req := range ordered {
-		if req.Rating == RatingGood {
-			good++
-		}
-	}
-	focus := make([]Requirement, 0, 3)
-	for _, rating := range []RequirementRating{RatingBad, RatingFair, RatingNotRated} {
-		for _, req := range ordered {
-			if req.Rating == rating && len(focus) < 3 {
-				focus = append(focus, req)
-			}
-		}
-	}
-	credit := CreditHours(profile)
-	return Dashboard{
-		Driver:        driver,
-		Profile:       profile,
-		Requirements:  ordered,
-		PracticeFocus: focus,
-		ReadyEstimate: EstimateReadyDate(profile, now),
-		PermitHold:    NewPermitHold(profile, now),
-		TotalPercent:  Percent(profile.TotalHours, TotalHoursRequired),
-		NightPercent:  Percent(profile.NightHours, NightHoursRequired),
-		GoodCount:     good,
-		HourCredit:    credit,
-		WeekChart:     WeeklyCreditChart(credit, now, ChartWeeks),
-		LastDrive:     DaysSinceLastDrive(credit, now),
-		Readiness:     NewRoadTestReadiness(credit, ordered),
-	}
-}
-
-func Percent(value, target float64) int {
-	if target <= 0 {
-		return 0
-	}
-	if value >= target {
-		return 100
-	}
-	return int(math.Max(0, math.Min(99, math.Floor(value/target*100))))
-}
-
-// ReadyConstraint names the requirement that sets a ready estimate's date.
-type ReadyConstraint string
-
-const (
-	ConstraintTotalHours ReadyConstraint = "total_hours"
-	ConstraintNightHours ReadyConstraint = "night_hours"
-	ConstraintPermitHold ReadyConstraint = "permit_hold"
-	ConstraintWeeklyCap  ReadyConstraint = "weekly_cap"
-)
-
-// ReadyEstimate is the projected date the hour requirements will be met and
-// the permit hold will have passed, with the constraint that sets it, or,
-// when there is none, a hint about what the driver should do next.
-type ReadyEstimate struct {
-	Date      *time.Time
-	WaitingOn ReadyConstraint
-	Hint      string
-}
-
-// EstimateReadyDate uses the observed cumulative pace and entry-week credit,
-// then applies the permit-hold floor. Entry dates do not verify drive dates.
-func EstimateReadyDate(profile Profile, now time.Time) ReadyEstimate {
-	if profile.PermitIssueDate == nil {
-		return ReadyEstimate{Hint: "Add permit issue date to estimate"}
-	}
-	start, today := startOfDay(*profile.PermitIssueDate), startOfDay(now)
-	credit := CreditHours(profile)
-	readyDate := today
-	waitingOn := ConstraintTotalHours
-	if credit.TotalHours < TotalHoursRequired || credit.NightHours < NightHoursRequired {
-		elapsed := today.Sub(start).Hours() / 24
-		if elapsed <= 0 || profile.TotalHours <= 0 {
-			return ReadyEstimate{Hint: "Add hours to estimate"}
-		}
-		if profile.NightHours <= 0 {
-			return ReadyEstimate{Hint: "Add night hours to estimate"}
-		}
-		totalPace, nightPace := profile.TotalHours/elapsed, profile.NightHours/elapsed
-		totalDays := projectedCreditDays(credit, today, totalPace, nightPace, TotalHoursRequired, 0)
-		nightDays := projectedCreditDays(credit, today, totalPace, nightPace, 0, NightHoursRequired)
-		days := max(totalDays, nightDays)
-		if nightDays > totalDays {
-			waitingOn = ConstraintNightHours
-		}
-		uncappedDays := max(0, int(math.Ceil((TotalHoursRequired-profile.TotalHours)/totalPace)), int(math.Ceil((NightHoursRequired-profile.NightHours)/nightPace)))
-		if days > uncappedDays {
-			waitingOn = ConstraintWeeklyCap
-		}
-		readyDate = today.AddDate(0, 0, days)
-	}
-	if holdEnd := permitHoldEnd(start); holdEnd.After(readyDate) {
-		readyDate, waitingOn = holdEnd, ConstraintPermitHold
-	}
-	if !readyDate.After(today) {
-		return ReadyEstimate{Hint: "Ready when every skill is rated Good"}
-	}
-	return ReadyEstimate{Date: &readyDate, WaitingOn: waitingOn}
-}
-
-// PermitHold counts down to the day the permit hold ends. Ends is nil until
-// the permit issue date is set; DaysLeft is 0 once the hold is over.
-type PermitHold struct {
-	Ends     *time.Time
-	DaysLeft int
-}
-
-func NewPermitHold(profile Profile, now time.Time) PermitHold {
-	if profile.PermitIssueDate == nil {
-		return PermitHold{}
-	}
-	ends := permitHoldEnd(startOfDay(*profile.PermitIssueDate))
-	days := int(math.Round(ends.Sub(startOfDay(now)).Hours() / 24))
-	return PermitHold{Ends: &ends, DaysLeft: max(days, 0)}
-}
-
-// RoadTestStep is a road-test requirement that the hour counts and skill
-// ratings do not track.
-type RoadTestStep struct {
-	Title  string
-	Detail string
-}
-
-// RoadTestSteps lists what the driver needs besides hours, skills and the
-// permit hold. While the hold runs, the road-test step gives the earliest
-// test date without saying when appointments open, which can change.
-func RoadTestSteps(hold PermitHold) []RoadTestStep {
-	roadTest := "Book a road test appointment."
-	if hold.Ends != nil && hold.DaysLeft > 0 {
-		roadTest = "The test date must be " + DisplayDate(hold.Ends) + " or later."
-	}
-	return []RoadTestStep{
-		{"Be at least 16", level2LicenseAgeDetail},
-		{"6 months with no violations", "No moving, seat belt, or cell phone convictions."},
-		{"Proof of insurance", dmvInsuranceDetail},
-		{"Schedule the road test", roadTest},
-	}
-}
-
 func FormatHours(hours float64) string {
 	return fmt.Sprintf("%.1f", hours)
 }
 
-func ParseRating(value string) (RequirementRating, bool) {
-	switch RequirementRating(value) {
-	case "", RatingNotRated:
-		return RatingNotRated, true
-	case RatingBad, RatingFair, RatingGood:
-		return RequirementRating(value), true
-	default:
-		return "", false
-	}
-}
-
 func NewDriverProfile(now time.Time) Profile { return Profile{UpdatedAt: now} }
-
-func DefaultRequirements(now time.Time) []Requirement {
-	items := []struct{ key, title, description string }{
-		{"quick-stop", "Quick stop", "Stop quickly and safely on the examiner's signal, keeping the car straight and under control."},
-		{"turn-about", "Turn about", "Check traffic, signal, and complete the turn safely with control and room to maneuver."},
-		{"stop-on-grade", "Stop on grade", "Stop under control, turn the wheels correctly for the slope, and set the parking brake."},
-		{"start-on-grade", "Start on grade", "Check traffic, release the parking brake, and move smoothly without rolling backward."},
-		{"backing", "Backing", "Look behind you and back slowly in a straight line while checking for traffic."},
-		{"approach-corner", "Approach corner", "Check traffic, signal early, and slow to a safe speed before reaching the corner."},
-		{"right-turns", "Right turns", "Signal, yield to pedestrians and traffic, and turn into the proper lane without swinging wide."},
-		{"left-turns", "Left turns", "Signal, yield to oncoming traffic and pedestrians, and finish in the proper lane."},
-		{"traffic-lights", "Traffic lights", "Observe signals, stop behind the line, and check traffic before proceeding on green."},
-		{"use-of-controls", "Use of controls", "Use mirrors, signals, steering, and other vehicle controls correctly without distraction."},
-		{"starts", "Starts", "Check mirrors and blind spots, signal when needed, and accelerate smoothly into traffic."},
-		{"use-of-lane", "Use of lane", "Keep a steady lane position and check mirrors and blind spots before changing lanes."},
-		{"use-of-brake", "Use of brake", "Brake smoothly and early enough to stop safely while keeping control."},
-		{"following", "Following", "Maintain at least a 2–3 second gap and allow more space in poor conditions."},
-		{"attention", "Attention", "Watch the road, scan for hazards, and respond safely to traffic and pedestrians."},
-		{"stop-signs", "Stop signs", "Make a complete stop behind the line and check traffic before proceeding."},
-		{"parking", "Parking", "Check surroundings, signal, and park safely within the space with the vehicle secured."},
-	}
-	requirements := make([]Requirement, len(items))
-	for i, item := range items {
-		requirements[i] = Requirement{Key: item.key, Title: item.title, Description: item.description, Rating: RatingNotRated, SortOrder: i + 1, UpdatedAt: now}
-	}
-	return requirements
-}
-
-func RequirementByKey(requirements []Requirement, key string) (Requirement, bool) {
-	for _, req := range requirements {
-		if req.Key == key {
-			return req, true
-		}
-	}
-	return Requirement{}, false
-}
 
 func ParseDate(value string, loc *time.Location) (*time.Time, error) {
 	value = strings.TrimSpace(value)
