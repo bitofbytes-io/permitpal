@@ -9,14 +9,12 @@ package ui
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import (
-	"fmt"
+import "github.com/drywaters/permitpal/internal/model"
 
-	"github.com/drywaters/permitpal/internal/model"
-)
-
-// DashboardPage is the signed-in page. Hour-progress partials live in
-// hours.templ, and checklist rows live in checklist.templ.
+// DashboardPage is the signed-in page. Each section lives in its own file:
+// hours.templ, readiness.templ, practice.templ, whatsleft.templ,
+// progress_form.templ, checklist_sheet.templ and checklist.templ, with the page
+// scripts in dashboard_scripts.templ.
 func DashboardPage(dashboard model.Dashboard) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -67,7 +65,7 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(dashboard.Driver.DisplayName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 24, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 22, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -85,98 +83,15 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"content-grid\"><aside class=\"dashboard-side\" aria-label=\"Progress controls\"><section class=\"side-panel\"><h2>Update progress</h2><form id=\"progress-form\" class=\"progress-form\" hx-post=\"/profile\" hx-target=\"#progress-panel\" hx-swap=\"outerHTML\" hx-sync=\"this:drop\" hx-disabled-elt=\"#progress-form button, #progress-form input\"><label for=\"total_hours\">Total hours (current)</label><div class=\"inline-unit\"><input id=\"total_hours\" name=\"total_hours\" type=\"text\" inputmode=\"decimal\" pattern=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"content-grid\"><aside class=\"dashboard-side\" aria-label=\"Progress controls\"><section class=\"side-panel\"><h2>Update progress</h2>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(recordedHoursPattern).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 40, Col: 115}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		templ_7745c5c3_Err = ProgressForm(dashboard).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" title=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("Enter 0 to %d hours, with up to one decimal place", model.MaxRecordedHours)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 40, Col: 214}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" autocomplete=\"off\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(model.FormatHours(dashboard.Profile.TotalHours)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 40, Col: 291}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"> <span>hours</span></div><label for=\"night_hours\">Night hours (current)</label><div class=\"inline-unit\"><input id=\"night_hours\" name=\"night_hours\" type=\"text\" inputmode=\"decimal\" pattern=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(recordedHoursPattern).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 45, Col: 115}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" title=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("Enter 0 to %d hours, with up to one decimal place", model.MaxRecordedHours)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 45, Col: 214}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" autocomplete=\"off\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(model.FormatHours(dashboard.Profile.NightHours)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 45, Col: 291}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"> <span>hours</span></div><label for=\"permit_issue_date\">Permit issue date</label> <input id=\"permit_issue_date\" name=\"permit_issue_date\" type=\"date\" value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var10 string
-		templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(model.DateValue(dashboard.Profile.PermitIssueDate)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 49, Col: 134}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"><p class=\"entry-note\">Keep recording current totals beyond 60 total and 10 night hours when needed. Increases count in the Monday–Sunday week saved, using the entry date rather than the drive date. Corrections remove the newest matching hours first.</p><button type=\"submit\">Save progress</button><p class=\"form-error\" role=\"alert\" hidden></p></form></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -188,272 +103,27 @@ func DashboardPage(dashboard model.Dashboard) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</aside><section class=\"dashboard-main\" aria-labelledby=\"checklist-heading\"><div class=\"clipboard-shell\"><div class=\"clipboard-clip\" aria-hidden=\"true\"></div><div class=\"sheet-title\"><h1 id=\"checklist-heading\">Road Test Skill Checklist</h1></div><div class=\"checklist-toolbar\" role=\"group\" aria-label=\"Checklist order\"><button type=\"button\" class=\"is-selected\" data-checklist-view=\"sheet\" aria-pressed=\"true\">All skills</button> <button type=\"button\" data-checklist-view=\"recent\" aria-pressed=\"false\">Recently mastered</button></div><p id=\"checklist-empty\" class=\"checklist-empty\" hidden>No skills are mastered yet.</p><div class=\"checklist-table\" aria-label=\"Driving skills\"><div class=\"checklist-head\" role=\"row\"><span>#</span> <span>Skill</span> <span>Bad</span> <span>Fair</span> <span>Good</span> <span>Last rated</span> <span>Notes</span> <span class=\"save-column\">OK</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</aside><section class=\"dashboard-main\" aria-labelledby=\"checklist-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, req := range dashboard.Requirements {
-			templ_7745c5c3_Err = RequirementRow(req).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><div class=\"checklist-reference\"><span>Skills from the NCDMV Level 2 road test score sheet.</span> <a href=\"https://www.ncdot.gov/dmv/license-id/driver-licenses/new-drivers/Pages/level2.aspx\" target=\"_blank\" rel=\"noopener noreferrer\">Learn more</a></div></div></section></div><footer class=\"encouragement-banner\"><div class=\"road-dashes\" aria-hidden=\"true\"></div><span>Keep practicing</span><p>You’ve got this. Stay consistent!</p><div class=\"checkers\" aria-hidden=\"true\"></div></footer></main></div><script nonce=\"")
+		templ_7745c5c3_Err = ChecklistSheet(dashboard).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.GetNonce(ctx)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 99, Col: 38}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</section></div><footer class=\"encouragement-banner\"><div class=\"road-dashes\" aria-hidden=\"true\"></div><span>Keep practicing</span><p>You’ve got this. Stay consistent!</p><div class=\"checkers\" aria-hidden=\"true\"></div></footer></main></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">\n\t\t\t\t// htmx does not swap error responses, so show a rejected save's plain-text\n\t\t\t\t// message in the form that sent it. The clear-rating button's requests\n\t\t\t\t// belong to its row. Each form sends one save at a time (hx-sync and\n\t\t\t\t// hx-disabled-elt on the form), so a second save from the same form is\n\t\t\t\t// dropped rather than queued. Hours and skill responses both replace\n\t\t\t\t// the readiness card, so a save from another form waits until the one\n\t\t\t\t// in flight has been applied. An older response then cannot overwrite\n\t\t\t\t// a newer change.\n\t\t\t\t(function () {\n\t\t\t\t\tvar forms = \"#progress-form, .checklist-row\";\n\t\t\t\t\tvar inflight = new Set();\n\t\t\t\t\tvar waiting = [];\n\n\t\t\t\t\tfunction saveForm(elt) {\n\t\t\t\t\t\treturn elt && elt.closest ? elt.closest(forms) : null;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction releaseNext() {\n\t\t\t\t\t\t// A released save can fail to start: the field was edited\n\t\t\t\t\t\t// invalid while it waited, or its row was already replaced.\n\t\t\t\t\t\t// Skip it and keep going, or later saves stay queued.\n\t\t\t\t\t\twhile (inflight.size === 0 && waiting.length > 0) {\n\t\t\t\t\t\t\tvar next = waiting.shift();\n\t\t\t\t\t\t\tif (!next.form.isConnected) {\n\t\t\t\t\t\t\t\tcontinue;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tnext.issue(true);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction waitingOn(form) {\n\t\t\t\t\t\tfor (var i = 0; i < waiting.length; i++) {\n\t\t\t\t\t\t\tif (waiting[i].form === form) {\n\t\t\t\t\t\t\t\treturn true;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn false;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction clearFeedback(form) {\n\t\t\t\t\t\tvar error = form.querySelector(\".form-error\");\n\t\t\t\t\t\terror.hidden = true;\n\t\t\t\t\t\terror.textContent = \"\";\n\t\t\t\t\t\tif (form.id === \"progress-form\") {\n\t\t\t\t\t\t\tvar progressSaved = document.querySelector(\"#progress-panel .save-feedback\");\n\t\t\t\t\t\t\tif (progressSaved) {\n\t\t\t\t\t\t\t\tprogressSaved.remove();\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar rowSaved = form.querySelector(\".row-save-feedback\");\n\t\t\t\t\t\tif (rowSaved) {\n\t\t\t\t\t\t\tvar ok = document.createElement(\"span\");\n\t\t\t\t\t\t\tok.textContent = \"OK\";\n\t\t\t\t\t\t\trowSaved.replaceWith(ok);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\t// Confirm runs before hx-sync. A same-form repeat is left for\n\t\t\t\t\t// hx-sync to drop. A different form is held and issued only\n\t\t\t\t\t// after the in-flight save's response has been applied.\n\t\t\t\t\tdocument.addEventListener(\"htmx:confirm\", function (event) {\n\t\t\t\t\t\tvar form = saveForm(event.detail.elt);\n\t\t\t\t\t\tif (!form || inflight.has(form)) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\t// This form is already waiting, and it has no request yet\n\t\t\t\t\t\t// for hx-sync to drop. Discard the repeat.\n\t\t\t\t\t\tif (waitingOn(form)) {\n\t\t\t\t\t\t\tevent.preventDefault();\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (inflight.size === 0 && waiting.length === 0) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tevent.preventDefault();\n\t\t\t\t\t\twaiting.push({ form: form, issue: event.detail.issueRequest });\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener(\"htmx:beforeRequest\", function (event) {\n\t\t\t\t\t\tvar form = saveForm(event.detail.elt);\n\t\t\t\t\t\tif (!form) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (!inflight.has(form)) {\n\t\t\t\t\t\t\tinflight.add(form);\n\t\t\t\t\t\t\t// The listener sits on the form that issued the save. htmx\n\t\t\t\t\t\t\t// swaps a skill row out of the document before afterRequest,\n\t\t\t\t\t\t\t// and a detached node does not bubble to document.\n\t\t\t\t\t\t\tform.addEventListener(\"htmx:afterRequest\", function onDone() {\n\t\t\t\t\t\t\t\tform.removeEventListener(\"htmx:afterRequest\", onDone);\n\t\t\t\t\t\t\t\tinflight.delete(form);\n\t\t\t\t\t\t\t\treleaseNext();\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar xhr = event.detail.xhr;\n\t\t\t\t\t\tclearFeedback(form);\n\t\t\t\t\t\t// htmx handles the response first: it swaps the row on success and\n\t\t\t\t\t\t// re-enables a rejected row's controls.\n\t\t\t\t\t\txhr.addEventListener(\"load\", function () {\n\t\t\t\t\t\t\tif (xhr.status !== 400) {\n\t\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tvar error = form.querySelector(\".form-error\");\n\t\t\t\t\t\t\terror.textContent = xhr.responseText.trim();\n\t\t\t\t\t\t\terror.hidden = error.textContent === \"\";\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t})();\n\n\t\t\t\t// Recently mastered hides skills that are still in practice and\n\t\t\t\t// orders the rest by sign-off date, newest first. Sheet order is\n\t\t\t\t// the numbered road-test order. Only a checklist swap refreshes\n\t\t\t\t// the view, and rows move only when that order changed, so a save\n\t\t\t\t// does not steal focus from another skill.\n\t\t\t\t(function () {\n\t\t\t\t\tvar table = document.querySelector(\".checklist-table\");\n\t\t\t\t\tvar buttons = document.querySelectorAll(\"[data-checklist-view]\");\n\t\t\t\t\tvar empty = document.getElementById(\"checklist-empty\");\n\t\t\t\t\tif (!table || buttons.length === 0) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction rows() {\n\t\t\t\t\t\treturn Array.prototype.slice.call(table.querySelectorAll(\".checklist-row\"));\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction masteredLabel(value) {\n\t\t\t\t\t\tvar match = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value);\n\t\t\t\t\t\tif (!match) {\n\t\t\t\t\t\t\treturn \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar year = Number(match[1]);\n\t\t\t\t\t\tvar month = Number(match[2]);\n\t\t\t\t\t\tvar day = Number(match[3]);\n\t\t\t\t\t\tvar date = new Date(year, month - 1, day);\n\t\t\t\t\t\tif (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {\n\t\t\t\t\t\t\treturn \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn \"Mastered \" + date.toLocaleDateString(\"en-US\", { month: \"short\", day: \"numeric\", year: \"numeric\" });\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction showEditedDate(input) {\n\t\t\t\t\t\tvar text = input.parentNode && input.parentNode.querySelector(\".mastered-status-text\");\n\t\t\t\t\t\tif (!text) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar label = masteredLabel(input.value);\n\t\t\t\t\t\ttext.textContent = label;\n\t\t\t\t\t\tinput.setAttribute(\"aria-label\", label || \"Mastered date\");\n\t\t\t\t\t}\n\n\t\t\t\t\ttable.addEventListener(\"input\", function (event) {\n\t\t\t\t\t\tif (event.target && event.target.name === \"rated_on\") {\n\t\t\t\t\t\t\tshowEditedDate(event.target);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\ttable.addEventListener(\"change\", function (event) {\n\t\t\t\t\t\tif (event.target && event.target.name === \"rated_on\") {\n\t\t\t\t\t\t\tshowEditedDate(event.target);\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tfunction apply(view) {\n\t\t\t\t\t\tvar list = rows();\n\t\t\t\t\t\tvar sorted = list.slice().sort(function (a, b) {\n\t\t\t\t\t\t\tif (view === \"recent\") {\n\t\t\t\t\t\t\t\tvar am = a.getAttribute(\"data-mastered\") || \"\";\n\t\t\t\t\t\t\t\tvar bm = b.getAttribute(\"data-mastered\") || \"\";\n\t\t\t\t\t\t\t\tif (am !== bm) {\n\t\t\t\t\t\t\t\t\treturn bm.localeCompare(am);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\treturn Number(a.getAttribute(\"data-order\")) - Number(b.getAttribute(\"data-order\"));\n\t\t\t\t\t\t});\n\t\t\t\t\t\tvar visible = 0;\n\t\t\t\t\t\tsorted.forEach(function (row) {\n\t\t\t\t\t\t\tvar show = view !== \"recent\" || row.hasAttribute(\"data-mastered\");\n\t\t\t\t\t\t\trow.hidden = !show;\n\t\t\t\t\t\t\tif (show) {\n\t\t\t\t\t\t\t\tvisible++;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t\tvar sameOrder = list.length === sorted.length;\n\t\t\t\t\t\tfor (var i = 0; sameOrder && i < sorted.length; i++) {\n\t\t\t\t\t\t\tif (list[i] !== sorted[i]) {\n\t\t\t\t\t\t\t\tsameOrder = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (!sameOrder) {\n\t\t\t\t\t\t\tvar focus = document.activeElement;\n\t\t\t\t\t\t\tvar range = null;\n\t\t\t\t\t\t\tif (focus && typeof focus.selectionStart === \"number\") {\n\t\t\t\t\t\t\t\trange = { start: focus.selectionStart, end: focus.selectionEnd };\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tsorted.forEach(function (row) {\n\t\t\t\t\t\t\t\ttable.appendChild(row);\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\tif (focus && document.contains(focus) && typeof focus.focus === \"function\") {\n\t\t\t\t\t\t\t\tfocus.focus();\n\t\t\t\t\t\t\t\tif (range && typeof focus.setSelectionRange === \"function\") {\n\t\t\t\t\t\t\t\t\tfocus.setSelectionRange(range.start, range.end);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (empty) {\n\t\t\t\t\t\t\tempty.hidden = view !== \"recent\" || visible !== 0;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tArray.prototype.forEach.call(buttons, function (button) {\n\t\t\t\t\t\t\tvar on = button.getAttribute(\"data-checklist-view\") === view;\n\t\t\t\t\t\t\tbutton.classList.toggle(\"is-selected\", on);\n\t\t\t\t\t\t\tbutton.setAttribute(\"aria-pressed\", on ? \"true\" : \"false\");\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\tArray.prototype.forEach.call(buttons, function (button) {\n\t\t\t\t\t\tbutton.addEventListener(\"click\", function () {\n\t\t\t\t\t\t\tapply(button.getAttribute(\"data-checklist-view\"));\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"htmx:afterSwap\", function (event) {\n\t\t\t\t\t\tvar detail = event.detail || {};\n\t\t\t\t\t\tvar target = detail.target;\n\t\t\t\t\t\tvar elt = detail.elt;\n\t\t\t\t\t\tvar inChecklist = target && target.closest && (target.closest(\".checklist-table\") || target.classList.contains(\"checklist-table\"));\n\t\t\t\t\t\tvar fromRow = elt && elt.closest && elt.closest(\".checklist-row\");\n\t\t\t\t\t\tif (!inChecklist && !fromRow) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar selected = document.querySelector(\"[data-checklist-view].is-selected\");\n\t\t\t\t\t\tif (selected) {\n\t\t\t\t\t\t\tapply(selected.getAttribute(\"data-checklist-view\"));\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = SaveFeedbackScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		return nil
-	})
-}
-
-func PracticeFocus(dashboard model.Dashboard, outOfBand bool) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<section id=\"practice-focus\" class=\"side-panel practice-panel\"")
+		templ_7745c5c3_Err = ChecklistViewScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if outOfBand {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " hx-swap-oob=\"outerHTML\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "><div class=\"practice-heading\"><span class=\"traffic-cone-icon\" aria-hidden=\"true\"></span><div><h2>Practice focus</h2></div></div><ol>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, req := range dashboard.PracticeFocus {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<li>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(req.Title)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 353, Col: 25}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</li>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</ol><p class=\"practice-note\">Focus on these skills during your next few drives.</p></section>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
-// WhatsLeft counts down to the end of the permit hold and lists the road-test
-// requirements that hours and skill ratings do not cover.
-func WhatsLeft(dashboard model.Dashboard, outOfBand bool) templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<section id=\"whats-left\" class=\"side-panel whats-left-panel\" aria-labelledby=\"whats-left-heading\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if outOfBand {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, " hx-swap-oob=\"outerHTML\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "><h2 id=\"whats-left-heading\">What’s left</h2>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if hold := dashboard.PermitHold; hold.Ends == nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<p class=\"hold-countdown-note\">Add your permit issue date to count down the ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(model.MinPermitHoldMonths))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 373, Col: 118}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "-month hold.</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else if hold.DaysLeft > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<p class=\"hold-countdown\"><strong>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var16 string
-			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(hold.DaysLeft))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 375, Col: 64}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</strong> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var17 string
-			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(daysWord(hold.DaysLeft))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 375, Col: 101}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, " to go</p><p class=\"hold-countdown-note\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var18 string
-			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(model.MinPermitHoldMonths))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 376, Col: 73}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "-month hold ends ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var19 string
-			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(model.DisplayDate(hold.Ends))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 376, Col: 122}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<p class=\"hold-countdown hold-countdown--done\"><strong>Hold complete</strong></p><p class=\"hold-countdown-note\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var20 string
-			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(model.MinPermitHoldMonths))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 379, Col: 73}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "-month hold ended ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var21 string
-			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(model.DisplayDate(hold.Ends))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 379, Col: 123}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</p>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<ul class=\"road-test-steps\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, step := range model.RoadTestSteps(dashboard.PermitHold) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<li><strong>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var22 string
-			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(step.Title)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 384, Col: 25}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</strong> <span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var23 string
-			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(step.Detail)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/dashboard.templ`, Line: 385, Col: 24}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span></li>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</ul></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

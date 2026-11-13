@@ -1,0 +1,39 @@
+package ui
+
+import (
+	"fmt"
+
+	"github.com/drywaters/permitpal/internal/model"
+)
+
+// WhatsLeft counts down to the end of the permit hold and lists the road-test
+// requirements that hours and skill ratings do not cover.
+templ WhatsLeft(dashboard model.Dashboard, outOfBand bool) {
+	<section
+		id="whats-left"
+		class="side-panel whats-left-panel"
+		aria-labelledby="whats-left-heading"
+		if outOfBand {
+			hx-swap-oob="outerHTML"
+		}
+	>
+		<h2 id="whats-left-heading">What’s left</h2>
+		if hold := dashboard.PermitHold; hold.Ends == nil {
+			<p class="hold-countdown-note">Add your permit issue date to count down the { fmt.Sprint(model.MinPermitHoldMonths) }-month hold.</p>
+		} else if hold.DaysLeft > 0 {
+			<p class="hold-countdown"><strong>{ fmt.Sprint(hold.DaysLeft) }</strong> { daysWord(hold.DaysLeft) } to go</p>
+			<p class="hold-countdown-note">{ fmt.Sprint(model.MinPermitHoldMonths) }-month hold ends { model.DisplayDate(hold.Ends) }</p>
+		} else {
+			<p class="hold-countdown hold-countdown--done"><strong>Hold complete</strong></p>
+			<p class="hold-countdown-note">{ fmt.Sprint(model.MinPermitHoldMonths) }-month hold ended { model.DisplayDate(hold.Ends) }</p>
+		}
+		<ul class="road-test-steps">
+			for _, step := range model.RoadTestSteps(dashboard.PermitHold) {
+				<li>
+					<strong>{ step.Title }</strong>
+					<span>{ step.Detail }</span>
+				</li>
+			}
+		</ul>
+	</section>
+}

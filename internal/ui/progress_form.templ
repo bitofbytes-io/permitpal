@@ -1,0 +1,29 @@
+package ui
+
+import (
+	"fmt"
+
+	"github.com/drywaters/permitpal/internal/model"
+)
+
+// ProgressForm is the sidebar form that records total hours, night hours and
+// the permit issue date. Its response replaces #progress-panel.
+templ ProgressForm(dashboard model.Dashboard) {
+								<form id="progress-form" class="progress-form" hx-post="/profile" hx-target="#progress-panel" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="#progress-form button, #progress-form input">
+	<label for="total_hours">Total hours (current)</label>
+	<div class="inline-unit">
+		<input id="total_hours" name="total_hours" type="text" inputmode="decimal" pattern={ recordedHoursPattern } title={ fmt.Sprintf("Enter 0 to %d hours, with up to one decimal place", model.MaxRecordedHours) } autocomplete="off" value={ model.FormatHours(dashboard.Profile.TotalHours) }/>
+		<span>hours</span>
+	</div>
+	<label for="night_hours">Night hours (current)</label>
+	<div class="inline-unit">
+		<input id="night_hours" name="night_hours" type="text" inputmode="decimal" pattern={ recordedHoursPattern } title={ fmt.Sprintf("Enter 0 to %d hours, with up to one decimal place", model.MaxRecordedHours) } autocomplete="off" value={ model.FormatHours(dashboard.Profile.NightHours) }/>
+		<span>hours</span>
+	</div>
+	<label for="permit_issue_date">Permit issue date</label>
+	<input id="permit_issue_date" name="permit_issue_date" type="date" value={ model.DateValue(dashboard.Profile.PermitIssueDate) }/>
+	<p class="entry-note">Keep recording current totals beyond 60 total and 10 night hours when needed. Increases count in the Monday–Sunday week saved, using the entry date rather than the drive date. Corrections remove the newest matching hours first.</p>
+	<button type="submit">Save progress</button>
+	<p class="form-error" role="alert" hidden></p>
+								</form>
+}
