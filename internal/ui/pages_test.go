@@ -96,7 +96,7 @@ func TestWeekChartFlagsCappedWeeksAndMatchesTotals(t *testing.T) {
 	disclosure := strings.Index(body, `<details class="week-values-disclosure">`)
 	srOnly := strings.Index(body, `<div class="sr-only">`)
 	closeDetails := strings.Index(body, "</details>")
-	if disclosure < 0 || srOnly < 0 || closeDetails < 0 || !(disclosure < closeDetails && closeDetails < srOnly) {
+	if disclosure < 0 || srOnly < 0 || closeDetails < 0 || disclosure >= closeDetails || closeDetails >= srOnly {
 		t.Fatalf("screen-reader table must stay outside the disclosure, html:\n%s", body)
 	}
 

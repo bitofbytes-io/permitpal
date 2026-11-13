@@ -20,5 +20,14 @@
       "matchManagers": ["dockerfile"],
       "pinDigests": true
     }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track the golangci-lint version pinned in the Makefile.",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": ["# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n(?:GOLANGCI_LINT_VERSION := )(?<currentValue>\\S+)"],
+      "versioningTemplate": "semver"
+    }
   ]
 }

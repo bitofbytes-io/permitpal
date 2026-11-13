@@ -95,7 +95,7 @@ func (m *Manager) SetSession(w http.ResponseWriter, username string, generation 
 	signature := m.sign(payload)
 	value := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + signature
 
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure follows SECURE_COOKIES, on in production and off only for local HTTP development
 		Name:     m.cfg.SessionCookie,
 		Value:    value,
 		Path:     "/",
@@ -107,7 +107,7 @@ func (m *Manager) SetSession(w http.ResponseWriter, username string, generation 
 }
 
 func (m *Manager) ClearSession(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124: Secure follows SECURE_COOKIES, on in production and off only for local HTTP development
 		Name:     m.cfg.SessionCookie,
 		Value:    "",
 		Path:     "/",

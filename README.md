@@ -161,7 +161,7 @@ make build
 
 `make test` runs the whole suite once with the race detector, so it needs cgo and a C compiler. Set `PERMITPAL_TEST_DATABASE_URL` to a disposable database to include the Postgres tests; without it they are skipped.
 
-`make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs staticcheck. Staticcheck is pinned as a Go tool dependency in `go.mod`, so no global installation is needed and Renovate can track its version. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
+`make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs golangci-lint with the checks in `.golangci.yml` (staticcheck, errcheck, gosec, govet, gofmt). golangci-lint runs through `go run` at the version pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, so no global installation is needed and Renovate tracks that pin. Suppress a finding only with a `//nolint:gosec // reason` comment that explains why it is safe. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
 
 CI also runs the dashboard feedback browser test in Chromium against both memory and Postgres stores. To run the same test locally with Node 24, set `PERMITPAL_TEST_DATABASE_URL` to a disposable database, then run from the repository root:
 

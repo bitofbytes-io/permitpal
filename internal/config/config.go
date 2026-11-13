@@ -190,7 +190,7 @@ func getEnvOrFile(key, defaultPath string) (string, error) {
 }
 
 func readSecret(path, name string, allowMissing bool) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: path comes from operator-set PERMITPAL_*_FILE and DATABASE_URL_FILE config
 	if err != nil {
 		if allowMissing && errors.Is(err, os.ErrNotExist) {
 			return "", nil
