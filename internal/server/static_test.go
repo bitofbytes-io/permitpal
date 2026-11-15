@@ -112,7 +112,7 @@ func TestStylesheetDarkPaletteOverridesEverySchemeToken(t *testing.T) {
 	if !ok {
 		t.Fatal("styles.css has no scheme token section starting at --page-top")
 	}
-	schemeTokens = "--page-top:" + schemeTokens
+	schemeTokens = "\n  --page-top:" + schemeTokens // restore the indentation the names regexp expects
 	names := regexp.MustCompile(`(?m)^\s+(--[a-z0-9-]+):`)
 	overridden := map[string]bool{}
 	for _, m := range names.FindAllStringSubmatch(dark, -1) {
