@@ -12,6 +12,7 @@ templ ProgressPanel(dashboard model.Dashboard) {
 
 templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 	<section id="progress-panel" class="progress-panel" aria-label="Current progress">
+		@MilestoneBanner(dashboard.Celebrations)
 		@LastDriveNudge(dashboard.LastDrive)
 		@hoursGauge("Current hours", "total hours", dashboard.Profile.TotalHours, model.TotalHoursRequired, dashboard.TotalPercent)
 		@hoursGauge("Night hours", "night hours", dashboard.Profile.NightHours, model.NightHoursRequired, dashboard.NightPercent)
@@ -22,6 +23,7 @@ templ ProgressPanelWithMessage(dashboard model.Dashboard, savedMessage string) {
 				<p class="save-feedback" role="status">{ savedMessage }</p>
 			}
 		</div>
+		@MilestoneBadges(dashboard.Milestones)
         <div class="hour-credit" aria-label="Weekly credited hours">
             <p>Weekly credited hours: { model.FormatHours(dashboard.HourCredit.TotalHours) } total, including { model.FormatHours(dashboard.HourCredit.NightHours) } night.</p>
             <p>Up to 10 total hours per Monday–Sunday entry week; night hours count within that limit.</p>
@@ -57,6 +59,40 @@ templ LastDriveNudge(nudge model.LastDrive) {
 		if nudge.Dated {
 			<p class="drive-nudge-note">The entry date is the save date, not the actual drive date.</p>
 		}
+	</section>
+}
+
+// MilestoneBanner congratulates the save that crossed one or more milestones.
+// It is part of that save's response only, so a reload or any later save drops it.
+templ MilestoneBanner(earned []model.Milestone) {
+	if len(earned) > 0 {
+		<div class="milestone-banner" role="status">
+			<strong>Milestone reached!</strong>
+			<span>{ milestoneNames(earned) }</span>
+		</div>
+	}
+}
+
+// MilestoneBadges shows every milestone: earned ones with the date of the
+// entry that crossed the line, the rest dimmed until a save crosses them.
+templ MilestoneBadges(milestones []model.Milestone) {
+	<section class="milestones" aria-labelledby="milestones-heading">
+		<h2 id="milestones-heading">Milestones</h2>
+		<ul class="milestone-list">
+			for _, milestone := range milestones {
+				<li class={ milestoneClass(milestone) }>
+					<span class="milestone-label">{ milestone.Label }</span>
+					if !milestone.Reached {
+						<span class="milestone-date">Not yet</span>
+					} else if milestone.On == nil {
+						<span class="milestone-date">Before dates were recorded</span>
+					} else {
+						<time class="milestone-date" datetime={ model.DateValue(milestone.On) }>{ model.DisplayDate(milestone.On) }</time>
+					}
+				</li>
+			}
+		</ul>
+		<p class="milestone-note">Dated by the save that crossed each line, not the actual drive date.</p>
 	</section>
 }
 

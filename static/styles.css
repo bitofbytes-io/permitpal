@@ -329,6 +329,75 @@ input {
   color: #8d1d1d;
 }
 
+.milestone-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 14px;
+  border: 2px solid var(--sign-dark);
+  border-radius: 8px;
+  background: #e6f4e8;
+  color: var(--sign-dark);
+  box-shadow: inset 5px 0 0 var(--line);
+}
+
+.milestone-banner strong {
+  font-size: 1.05rem;
+}
+
+.milestones {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.milestones h2 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.milestone-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.milestone {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px dashed var(--table-line);
+  border-radius: 8px;
+  background: rgba(255, 253, 247, 0.6);
+  color: var(--muted);
+}
+
+.milestone--reached {
+  border: 2px solid var(--sign);
+  background: #e6f4e8;
+  color: var(--sign-dark);
+}
+
+.milestone-label {
+  font-weight: 700;
+}
+
+.milestone-date {
+  font-size: 0.82rem;
+}
+
+.milestone-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .hour-credit {
   grid-column: 1 / -1;
   min-width: 0;

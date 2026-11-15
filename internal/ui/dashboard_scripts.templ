@@ -52,6 +52,10 @@ templ SaveFeedbackScript() {
 				if (progressSaved) {
 					progressSaved.remove();
 				}
+				var banner = document.querySelector("#progress-panel .milestone-banner");
+				if (banner) {
+					banner.remove();
+				}
 				return;
 			}
 			var rowSaved = form.querySelector(".row-save-feedback");

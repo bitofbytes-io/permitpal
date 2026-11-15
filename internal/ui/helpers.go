@@ -2,12 +2,29 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/drywaters/permitpal/internal/model"
 )
 
 // recordedHoursPattern matches the 1,000-hour cumulative input ceiling.
 const recordedHoursPattern = `(1000(\.0)?|[0-9]{1,3}(\.[0-9])?|\.[0-9])`
+
+func milestoneClass(milestone model.Milestone) string {
+	if milestone.Reached {
+		return "milestone milestone--reached"
+	}
+	return "milestone"
+}
+
+// milestoneNames joins badge labels for the celebration banner.
+func milestoneNames(earned []model.Milestone) string {
+	labels := make([]string, len(earned))
+	for i, milestone := range earned {
+		labels[i] = milestone.Label
+	}
+	return strings.Join(labels, ", ")
+}
 
 func progressStyle(percent int) string {
 	return fmt.Sprintf("--progress:%d%%", percent)

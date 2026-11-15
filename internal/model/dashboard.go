@@ -26,6 +26,10 @@ type Dashboard struct {
 	HourCredit    HourCredit
 	WeekChart     WeekCreditChart
 	LastDrive     LastDrive
+	Milestones    []Milestone
+	// Celebrations are the badges the save that built this dashboard earned.
+	// Only that save response sets them, so the banner shows once.
+	Celebrations []Milestone
 }
 
 func NewDashboard(driver Driver, profile Profile, requirements []Requirement, now time.Time) Dashboard {
@@ -59,6 +63,7 @@ func NewDashboard(driver Driver, profile Profile, requirements []Requirement, no
 		HourCredit:    credit,
 		WeekChart:     WeeklyCreditChart(credit, now, ChartWeeks),
 		LastDrive:     DaysSinceLastDrive(credit, now),
+		Milestones:    Milestones(profile),
 		Readiness:     NewRoadTestReadiness(credit, ordered),
 	}
 }
