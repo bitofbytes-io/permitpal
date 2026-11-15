@@ -3,6 +3,8 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -87,6 +89,39 @@ func TestWebAppManifestIsServedWithItsIcons(t *testing.T) {
 	_ = readBody(t, res)
 	if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "image/png" {
 		t.Fatalf("apple-touch-icon: status=%d type=%q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+}
+
+func TestStylesheetDarkPaletteOverridesEverySchemeToken(t *testing.T) {
+	raw, err := os.ReadFile("../../static/styles.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(raw)
+	const darkMedia = "@media (prefers-color-scheme: dark) {"
+	light, dark, ok := strings.Cut(css, darkMedia)
+	if !ok {
+		t.Fatalf("styles.css has no %q block", darkMedia)
+	}
+	if !strings.Contains(css, "color-scheme: light dark;") {
+		t.Fatal("styles.css must declare color-scheme: light dark so native controls follow the palette")
+	}
+	// The block closes at the first rule at column zero after the media query's :root rule.
+	dark, _, _ = strings.Cut(dark, "\n}\n")
+	_, schemeTokens, ok := strings.Cut(light, "--page-top:")
+	if !ok {
+		t.Fatal("styles.css has no scheme token section starting at --page-top")
+	}
+	schemeTokens = "--page-top:" + schemeTokens
+	names := regexp.MustCompile(`(?m)^\s+(--[a-z0-9-]+):`)
+	overridden := map[string]bool{}
+	for _, m := range names.FindAllStringSubmatch(dark, -1) {
+		overridden[m[1]] = true
+	}
+	for _, m := range names.FindAllStringSubmatch(schemeTokens, -1) {
+		if !overridden[m[1]] {
+			t.Errorf("dark palette does not override %s", m[1])
+		}
 	}
 }
 
