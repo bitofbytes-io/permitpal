@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPageScriptsCarryTheCSPNonce(t *testing.T) {
@@ -122,6 +126,25 @@ func TestStylesheetDarkPaletteOverridesEverySchemeToken(t *testing.T) {
 		if !overridden[m[1]] {
 			t.Errorf("dark palette does not override %s", m[1])
 		}
+	}
+}
+
+// TestColourSchemeInBrowser loads the dashboard in Chromium emulating light and
+// dark and checks that components render the scheme tokens' colours, so a rule
+// that stops using a token or is overridden later fails. Like the dashboard
+// feedback test, it runs only when PERMITPAL_PLAYWRIGHT_MODULE is set.
+func TestColourSchemeInBrowser(t *testing.T) {
+	if os.Getenv("PERMITPAL_PLAYWRIGHT_MODULE") == "" {
+		t.Skip("PERMITPAL_PLAYWRIGHT_MODULE is not set; set it to a Playwright module path to run the browser test")
+	}
+	t.Chdir("../..") // The page loads its stylesheet from ./static.
+	ts := httptest.NewServer(newTestApp(t).Router())
+	defer ts.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "node", "internal/server/testdata/colour_scheme.cjs", ts.URL).CombinedOutput()
+	if err != nil {
+		t.Fatalf("browser check failed: %v\n%s", err, output)
 	}
 }
 

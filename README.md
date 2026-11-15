@@ -171,16 +171,16 @@ make build
 
 `make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs golangci-lint with the checks in `.golangci.yml` (staticcheck, errcheck, gosec, govet, gofmt). golangci-lint runs through `go run` at the version pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, so no global installation is needed and Renovate tracks that pin. Suppress a finding only with a `//nolint:gosec // reason` comment that explains why it is safe. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
 
-CI also runs the dashboard feedback browser test in Chromium against both memory and Postgres stores. To run the same test locally with Node 24, set `PERMITPAL_TEST_DATABASE_URL` to a disposable database, then run from the repository root:
+CI also runs the dashboard feedback browser test in Chromium against both memory and Postgres stores, and a colour scheme test that emulates light and dark and checks the rendered colours of key components. To run the same tests locally with Node 24, set `PERMITPAL_TEST_DATABASE_URL` to a disposable database, then run from the repository root:
 
 ```bash
 npm ci --prefix test-support/browser
 test-support/browser/node_modules/.bin/playwright install --with-deps chromium
 export PERMITPAL_PLAYWRIGHT_MODULE="$PWD/test-support/browser/node_modules/playwright"
 : "${PERMITPAL_TEST_DATABASE_URL:?Set a disposable Postgres test database}"
-go test -race -count=1 -v ./internal/server -run '^TestDashboardSaveFeedbackInBrowser$'
+go test -race -count=1 -v ./internal/server -run '^(TestDashboardSaveFeedbackInBrowser|TestColourSchemeInBrowser)$'
 ```
 
-The test uses its own `aiden`/`test-password` fixture and temporary database schema; it needs no production credentials. Leave `PERMITPAL_PLAYWRIGHT_MODULE` unset for ordinary Go test runs to avoid running Chromium twice.
+The tests use their own `aiden`/`test-password` fixture and temporary database schema; it needs no production credentials. Leave `PERMITPAL_PLAYWRIGHT_MODULE` unset for ordinary Go test runs to avoid running Chromium twice.
 
 Database tests use isolated temporary schemas and verify migration 003 up/down/up. Use only a disposable database for the test URL. For two-account browser checks, set `PERMITPAL_USERS_FILE` and `SESSION_SECRET` in `local.mk`, then run `make dev`. Sign in as each driver, save hours and a rating, and confirm that the other driver's tracker is unchanged.
