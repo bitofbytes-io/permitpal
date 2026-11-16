@@ -61,14 +61,14 @@ jobs:
         run: |
           npm ci --prefix test-support/browser
           test-support/browser/node_modules/.bin/playwright install --with-deps chromium
-      - name: Test dashboard feedback in Chromium with both stores
+      - name: Test dashboard feedback and colour scheme in Chromium
         env:
           PERMITPAL_PLAYWRIGHT_MODULE: ${{ github.workspace }}/test-support/browser/node_modules/playwright
         run: |
           : "${PERMITPAL_PLAYWRIGHT_MODULE:?Missing Playwright module path}"
           : "${PERMITPAL_TEST_DATABASE_URL:?Missing disposable Postgres test database}"
           node -e 'require(process.env.PERMITPAL_PLAYWRIGHT_MODULE)'
-          go test -race -count=1 -v ./internal/server -run '^TestDashboardSaveFeedbackInBrowser$'
+          go test -race -count=1 -v ./internal/server -run '^(TestDashboardSaveFeedbackInBrowser|TestColourSchemeInBrowser)$'
 
   build-and-trigger:
     needs: test

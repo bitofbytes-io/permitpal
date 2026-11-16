@@ -67,6 +67,10 @@ Failed logins are limited to 20 per username and, when the real client IP is kno
 
 Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
 
+## Dark colour scheme
+
+`static/styles.css` follows the device setting through `prefers-color-scheme: dark`; there is no toggle and no configuration. Surface, text, rating and week-chart colours are custom properties in `:root`, with the dark values in the `@media (prefers-color-scheme: dark)` block. Add a token to both. A test fails when the dark block misses one the light palette defines. The header, odometer, estimate sign, encouragement banner and login splash are dark in both schemes. Text pairs are chosen for WCAG AA (4.5:1) and chart marks and form field borders for 3:1. The home-screen manifest keeps one `background_color`, so an installed app's launch splash stays cream until the page loads.
+
 ## Install to the home screen
 
 Every page links a web app manifest (`static/site.webmanifest`), a theme color, and an `apple-touch-icon`, so Chrome offers to install PermitPal and iOS Safari uses the icon for "Add to Home Screen". The manifest and its 192, 512, and maskable 512 icons (`static/icons/`) are static files served by the existing `/static/` handler with no login, because browsers fetch the manifest without credentials. The `.webmanifest` extension is registered as `application/manifest+json` in the binary. No configuration is needed. Installation needs HTTPS, which production already uses; `http://localhost` also qualifies in development.
@@ -167,16 +171,16 @@ make build
 
 `make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs golangci-lint with the checks in `.golangci.yml` (staticcheck, errcheck, gosec, govet, gofmt). golangci-lint runs through `go run` at the version pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, so no global installation is needed and Renovate tracks that pin. Suppress a finding only with a `//nolint:gosec // reason` comment that explains why it is safe. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
 
-CI also runs the dashboard feedback browser test in Chromium against both memory and Postgres stores. To run the same test locally with Node 24, set `PERMITPAL_TEST_DATABASE_URL` to a disposable database, then run from the repository root:
+CI also runs the dashboard feedback browser test in Chromium against both memory and Postgres stores, and a colour scheme test that emulates light and dark and checks the rendered colours of key components. To run the same tests locally with Node 24, set `PERMITPAL_TEST_DATABASE_URL` to a disposable database, then run from the repository root:
 
 ```bash
 npm ci --prefix test-support/browser
 test-support/browser/node_modules/.bin/playwright install --with-deps chromium
 export PERMITPAL_PLAYWRIGHT_MODULE="$PWD/test-support/browser/node_modules/playwright"
 : "${PERMITPAL_TEST_DATABASE_URL:?Set a disposable Postgres test database}"
-go test -race -count=1 -v ./internal/server -run '^TestDashboardSaveFeedbackInBrowser$'
+go test -race -count=1 -v ./internal/server -run '^(TestDashboardSaveFeedbackInBrowser|TestColourSchemeInBrowser)$'
 ```
 
-The test uses its own `aiden`/`test-password` fixture and temporary database schema; it needs no production credentials. Leave `PERMITPAL_PLAYWRIGHT_MODULE` unset for ordinary Go test runs to avoid running Chromium twice.
+The tests use their own `aiden`/`test-password` fixture and temporary database schema; it needs no production credentials. Leave `PERMITPAL_PLAYWRIGHT_MODULE` unset for ordinary Go test runs to avoid running Chromium twice.
 
 Database tests use isolated temporary schemas and verify migration 003 up/down/up. Use only a disposable database for the test URL. For two-account browser checks, set `PERMITPAL_USERS_FILE` and `SESSION_SECRET` in `local.mk`, then run `make dev`. Sign in as each driver, save hours and a rating, and confirm that the other driver's tracker is unchanged.
