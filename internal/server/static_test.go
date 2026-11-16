@@ -1,10 +1,16 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPageScriptsCarryTheCSPNonce(t *testing.T) {
@@ -87,6 +93,58 @@ func TestWebAppManifestIsServedWithItsIcons(t *testing.T) {
 	_ = readBody(t, res)
 	if res.StatusCode != http.StatusOK || res.Header.Get("Content-Type") != "image/png" {
 		t.Fatalf("apple-touch-icon: status=%d type=%q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+}
+
+func TestStylesheetDarkPaletteOverridesEverySchemeToken(t *testing.T) {
+	raw, err := os.ReadFile("../../static/styles.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(raw)
+	const darkMedia = "@media (prefers-color-scheme: dark) {"
+	light, dark, ok := strings.Cut(css, darkMedia)
+	if !ok {
+		t.Fatalf("styles.css has no %q block", darkMedia)
+	}
+	if !strings.Contains(css, "color-scheme: light dark;") {
+		t.Fatal("styles.css must declare color-scheme: light dark so native controls follow the palette")
+	}
+	// The block closes at the first rule at column zero after the media query's :root rule.
+	dark, _, _ = strings.Cut(dark, "\n}\n")
+	_, schemeTokens, ok := strings.Cut(light, "--page-top:")
+	if !ok {
+		t.Fatal("styles.css has no scheme token section starting at --page-top")
+	}
+	schemeTokens = "\n  --page-top:" + schemeTokens // restore the indentation the names regexp expects
+	names := regexp.MustCompile(`(?m)^\s+(--[a-z0-9-]+):`)
+	overridden := map[string]bool{}
+	for _, m := range names.FindAllStringSubmatch(dark, -1) {
+		overridden[m[1]] = true
+	}
+	for _, m := range names.FindAllStringSubmatch(schemeTokens, -1) {
+		if !overridden[m[1]] {
+			t.Errorf("dark palette does not override %s", m[1])
+		}
+	}
+}
+
+// TestColourSchemeInBrowser loads the dashboard in Chromium emulating light and
+// dark and checks that components render the scheme tokens' colours, so a rule
+// that stops using a token or is overridden later fails. Like the dashboard
+// feedback test, it runs only when PERMITPAL_PLAYWRIGHT_MODULE is set.
+func TestColourSchemeInBrowser(t *testing.T) {
+	if os.Getenv("PERMITPAL_PLAYWRIGHT_MODULE") == "" {
+		t.Skip("PERMITPAL_PLAYWRIGHT_MODULE is not set; set it to a Playwright module path to run the browser test")
+	}
+	t.Chdir("../..") // The page loads its stylesheet from ./static.
+	ts := httptest.NewServer(newTestApp(t).Router())
+	defer ts.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, "node", "internal/server/testdata/colour_scheme.cjs", ts.URL).CombinedOutput()
+	if err != nil {
+		t.Fatalf("browser check failed: %v\n%s", err, output)
 	}
 }
 
