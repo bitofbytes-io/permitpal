@@ -27,6 +27,28 @@ templ WhatsLeft(dashboard model.Dashboard, outOfBand bool) {
 			<p class="hold-countdown hold-countdown--done"><strong>Hold complete</strong></p>
 			<p class="hold-countdown-note">{ fmt.Sprint(model.MinPermitHoldMonths) }-month hold ended { model.DisplayDate(hold.Ends) }</p>
 		}
+		<section class="appointment" aria-labelledby="appointment-heading">
+			<h3 id="appointment-heading">Road test appointment</h3>
+			if appt := dashboard.Appointment; appt.Date == nil {
+				<p class="hold-countdown-note">Add the date you booked to count down to it.</p>
+			} else if appt.Passed {
+				<p class="hold-countdown hold-countdown--done"><strong>Date has passed</strong></p>
+				<p class="hold-countdown-note">Appointment was { model.DisplayDate(appt.Date) }</p>
+			} else if appt.DaysLeft == 0 {
+				<p class="hold-countdown hold-countdown--done"><strong>Today</strong></p>
+				<p class="hold-countdown-note">Appointment is { model.DisplayDate(appt.Date) }</p>
+			} else {
+				<p class="hold-countdown"><strong>{ fmt.Sprint(appt.DaysLeft) }</strong> { daysWord(appt.DaysLeft) } to go</p>
+				<p class="hold-countdown-note">Appointment is { model.DisplayDate(appt.Date) }</p>
+			}
+			if len(dashboard.Appointment.Warnings) > 0 {
+				<ul class="appointment-warnings">
+					for _, warning := range dashboard.Appointment.Warnings {
+						<li data-warning={ string(warning.Kind) }><strong>Heads up:</strong> { warning.Message }</li>
+					}
+				</ul>
+			}
+		</section>
 		<ul class="road-test-steps">
 			for _, step := range model.RoadTestSteps(dashboard.PermitHold) {
 				<li>

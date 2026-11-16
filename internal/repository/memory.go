@@ -63,6 +63,10 @@ func copyProfile(profile model.Profile) model.Profile {
 		date := *profile.PermitIssueDate
 		profile.PermitIssueDate = &date
 	}
+	if profile.RoadTestDate != nil {
+		date := *profile.RoadTestDate
+		profile.RoadTestDate = &date
+	}
 	return profile
 }
 func copyRequirement(req model.Requirement) model.Requirement {
@@ -95,6 +99,10 @@ func (s *MemoryStore) UpdateProfile(_ context.Context, driverID int64, profile m
 	if err := validateProfileHours(profile); err != nil {
 		return model.Profile{}, err
 	}
+	if profile.KeepRoadTestDate {
+		profile.RoadTestDate = state.profile.RoadTestDate
+	}
+	profile.KeepRoadTestDate = false
 	profile.HourEntries = model.AppendHourEntry(state.profile, profile, recordedAt)
 	profile.UpdatedAt = recordedAt
 	state.profile = copyProfile(profile)

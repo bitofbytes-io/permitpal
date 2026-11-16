@@ -1155,6 +1155,35 @@ input {
   font-size: 0.86rem;
 }
 
+.appointment {
+  margin: 14px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--divider-soft);
+}
+
+.appointment h3 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+
+.appointment-warnings {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.appointment-warnings li {
+  border-left: 4px solid var(--fair-accent);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--row-fair);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .road-test-steps {
   display: grid;
   gap: 10px;

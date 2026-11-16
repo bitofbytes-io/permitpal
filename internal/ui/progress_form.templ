@@ -22,6 +22,8 @@ templ ProgressForm(dashboard model.Dashboard) {
 	</div>
 	<label for="permit_issue_date">Permit issue date</label>
 	<input id="permit_issue_date" name="permit_issue_date" type="date" value={ model.DateValue(dashboard.Profile.PermitIssueDate) }/>
+	<label for="road_test_date">Road test appointment (optional)</label>
+	<input id="road_test_date" name="road_test_date" type="date" value={ model.DateValue(dashboard.Profile.RoadTestDate) }/>
 	<p class="entry-note">Keep recording current totals beyond 60 total and 10 night hours when needed. Increases count in the Monday–Sunday week saved, using the entry date rather than the drive date. Corrections remove the newest matching hours first.</p>
 	<button type="submit">Save progress</button>
 	<p class="form-error" role="alert" hidden></p>

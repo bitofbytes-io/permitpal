@@ -190,6 +190,58 @@ func TestWhatsLeftCountsDownPermitHold(t *testing.T) {
 	}
 }
 
+func TestWhatsLeftShowsAppointmentCountdownAndWarnings(t *testing.T) {
+	date := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+	tests := []struct {
+		name        string
+		appointment model.RoadTestAppointment
+		want        []string
+		notWant     []string
+	}{
+		{"none", model.RoadTestAppointment{}, []string{"Road test appointment", "Add the date you booked"}, []string{"appointment-warnings"}},
+		{"upcoming", model.RoadTestAppointment{Date: &date, DaysLeft: 15}, []string{"<strong>15</strong> days to go", "Appointment is Dec 1, 2026"}, []string{"appointment-warnings"}},
+		{"tomorrow", model.RoadTestAppointment{Date: &date, DaysLeft: 1}, []string{"<strong>1</strong> day to go"}, nil},
+		{"today", model.RoadTestAppointment{Date: &date}, []string{"<strong>Today</strong>"}, nil},
+		{"passed", model.RoadTestAppointment{Date: &date, Passed: true}, []string{"Date has passed", "Appointment was Dec 1, 2026"}, nil},
+		{
+			"warned",
+			model.RoadTestAppointment{Date: &date, DaysLeft: 15, Warnings: []model.AppointmentWarning{{Kind: model.WarnBeforeEligible, Message: "Too early <b>"}}},
+			[]string{`class="appointment-warnings"`, `data-warning="before_eligible"`, "Heads up:", "Too early &lt;b&gt;"},
+			[]string{"<b>"},
+		},
+	}
+	for _, tt := range tests {
+		var buf bytes.Buffer
+		if err := WhatsLeft(model.Dashboard{Appointment: tt.appointment}, false).Render(context.Background(), &buf); err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range tt.want {
+			if !strings.Contains(buf.String(), want) {
+				t.Errorf("%s: card missing %q", tt.name, want)
+			}
+		}
+		for _, notWant := range tt.notWant {
+			if strings.Contains(buf.String(), notWant) {
+				t.Errorf("%s: card contains %q", tt.name, notWant)
+			}
+		}
+	}
+}
+
+func TestProgressFormHasAppointmentField(t *testing.T) {
+	date := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+	var buf bytes.Buffer
+	dashboard := model.Dashboard{Profile: model.Profile{RoadTestDate: &date}}
+	if err := ProgressForm(dashboard).Render(context.Background(), &buf); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`name="road_test_date"`, `type="date"`, `value="2026-12-01"`, "Road test appointment (optional)"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("form missing %q: %s", want, buf.String())
+		}
+	}
+}
+
 func TestProfileUpdateRefreshesCountdown(t *testing.T) {
 	var buf bytes.Buffer
 	if err := ProfileUpdate(model.Dashboard{}).Render(context.Background(), &buf); err != nil {

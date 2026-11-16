@@ -49,7 +49,7 @@ func (s *PostgresStore) UpdateProfile(ctx context.Context, driverID int64, profi
 	}
 	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit
 	var previous model.Profile
-	err = tx.QueryRow(ctx, `select total_hours,night_hours from app_profile where driver_id=$1 for update`, driverID).Scan(&previous.TotalHours, &previous.NightHours)
+	err = tx.QueryRow(ctx, `select total_hours,night_hours,road_test_date from app_profile where driver_id=$1 for update`, driverID).Scan(&previous.TotalHours, &previous.NightHours, &previous.RoadTestDate)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Profile{}, ErrNotFound
 	}
@@ -77,7 +77,13 @@ func (s *PostgresStore) UpdateProfile(ctx context.Context, driverID int64, profi
 			return model.Profile{}, err
 		}
 	}
-	err = tx.QueryRow(ctx, `update app_profile set permit_issue_date=$2,total_hours=$3,night_hours=$4,updated_at=$5 where driver_id=$1 returning updated_at`, driverID, profile.PermitIssueDate, profile.TotalHours, profile.NightHours, recordedAt).Scan(&profile.UpdatedAt)
+	// The appointment read above holds the row lock, so keeping it cannot
+	// overwrite one saved by a concurrent request.
+	if profile.KeepRoadTestDate {
+		profile.RoadTestDate = previous.RoadTestDate
+	}
+	profile.KeepRoadTestDate = false
+	err = tx.QueryRow(ctx, `update app_profile set permit_issue_date=$2,total_hours=$3,night_hours=$4,updated_at=$5,road_test_date=$6 where driver_id=$1 returning updated_at`, driverID, profile.PermitIssueDate, profile.TotalHours, profile.NightHours, recordedAt, profile.RoadTestDate).Scan(&profile.UpdatedAt)
 	if err != nil {
 		return model.Profile{}, err
 	}
@@ -110,7 +116,7 @@ func (s *PostgresStore) getProfile(ctx context.Context, driverID int64) (model.P
 	}
 	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit
 	var profile model.Profile
-	err = tx.QueryRow(ctx, `select permit_issue_date,total_hours,night_hours,updated_at from app_profile where driver_id=$1`, driverID).Scan(&profile.PermitIssueDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
+	err = tx.QueryRow(ctx, `select permit_issue_date,road_test_date,total_hours,night_hours,updated_at from app_profile where driver_id=$1`, driverID).Scan(&profile.PermitIssueDate, &profile.RoadTestDate, &profile.TotalHours, &profile.NightHours, &profile.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return model.Profile{}, ErrNotFound
 	}
