@@ -47,14 +47,15 @@ templ SaveFeedbackScript() {
 			var error = form.querySelector(".form-error");
 			error.hidden = true;
 			error.textContent = "";
+			// A milestone celebration is one-time: any later save, skill or hours, ends it.
+			var banner = document.querySelector("#progress-panel .milestone-banner");
+			if (banner) {
+				banner.remove();
+			}
 			if (form.id === "progress-form") {
 				var progressSaved = document.querySelector("#progress-panel .save-feedback");
 				if (progressSaved) {
 					progressSaved.remove();
-				}
-				var banner = document.querySelector("#progress-panel .milestone-banner");
-				if (banner) {
-					banner.remove();
 				}
 				return;
 			}

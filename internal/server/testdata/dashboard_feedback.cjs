@@ -460,10 +460,21 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     // Cumulative inputs stay unchanged while the separate entry-week credit
     // and limiting estimate refresh through the real htmx save response.
     assert.equal(await progressForm.locator("[name=recorded_on], [name=drive_date], [name=weekly_hours]").count(), 0);
+    let celebrationEnded = false;
     for (const [total, credited, night] of [[15, 10, 10], [15, 10, 10], [12, 10, 10], [8, 8, 8], [6, 6, 2]]) {
       await page.locator("#total_hours").fill(String(total));
       await page.locator("#night_hours").fill(String(night));
       await saveProgress();
+      if (!celebrationEnded) {
+        // The save that crossed 10 hours shows the one-time banner. A skill
+        // save, which does not replace the progress panel, ends it.
+        assert.equal(await panel.locator(".milestone-banner").count(), 1, "crossing 10 hours was not celebrated");
+        await other.locator("[name=notes]").fill("After the celebration");
+        await update(other, "Quick stop");
+        assert.deepEqual(await statuses(other), ["Saved"]);
+        assert.equal(await panel.locator(".milestone-banner").count(), 0, "a skill save left the milestone banner");
+        celebrationEnded = true;
+      }
       assert.match(await panel.getByLabel("Weekly credited hours").innerText(), new RegExp(`Weekly credited hours: ${credited}\\.0 total, including ${night}\\.0 night`));
       assert.match(await panel.innerText(), /Last dated entry was today/);
       assert.match(await panel.innerText(), /The entry date is the save date, not the actual drive date/);

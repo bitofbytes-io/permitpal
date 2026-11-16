@@ -11,6 +11,9 @@ type Milestone struct {
 	Label   string
 	Reached bool
 	On      *time.Time
+
+	// crossedAt is the instant of the entry that crossed the line.
+	crossedAt time.Time
 }
 
 type milestoneLine struct {
@@ -45,13 +48,14 @@ func Milestones(profile Profile) []Milestone {
 				tenths = entry.NightTenths
 			}
 			if tenths < line.tenths {
-				milestones[i].Reached, milestones[i].On = false, nil
+				milestones[i] = Milestone{Key: line.key, Label: line.label}
 				continue
 			}
 			if milestones[i].Reached {
 				continue
 			}
 			milestones[i].Reached = true
+			milestones[i].crossedAt = entry.RecordedAt
 			if !entry.RecordedOn.IsZero() {
 				on := entry.RecordedOn
 				milestones[i].On = &on
@@ -61,13 +65,17 @@ func Milestones(profile Profile) []Milestone {
 	return milestones
 }
 
-// NewMilestones lists the badges a save earned: reached by next but not by
-// previous. A badge lost to a correction and earned again counts as new.
-func NewMilestones(previous, next Profile) []Milestone {
-	before := Milestones(previous)
+// NewMilestones lists the badges the save made at instant at earned: those
+// crossed by a dated entry stamped with at; an undated opening balance never
+// counts, whatever its stamp. It reads only the profile the
+// repository returned, which was reconciled under the write lock, so a
+// concurrent save that crossed the line first earns the celebration and one
+// that added no entry does not. A badge lost to a correction and earned again
+// counts as new.
+func NewMilestones(saved Profile, at time.Time) []Milestone {
 	var earned []Milestone
-	for i, milestone := range Milestones(next) {
-		if milestone.Reached && !before[i].Reached {
+	for _, milestone := range Milestones(saved) {
+		if milestone.Reached && milestone.On != nil && milestone.crossedAt.Equal(at) {
 			earned = append(earned, milestone)
 		}
 	}

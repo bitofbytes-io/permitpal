@@ -3,6 +3,7 @@ package model
 import (
 	"slices"
 	"testing"
+	"time"
 )
 
 func reachedMilestones(p Profile) map[string]string {
@@ -89,29 +90,50 @@ func TestMilestonesUndatedOpeningBalance(t *testing.T) {
 }
 
 func TestNewMilestonesReportsOnlyBadgesTheSaveEarned(t *testing.T) {
-	p := saveHours(Profile{}, 5, 0, dateOn("2026-01-01"))
-	next := saveHours(p, 31, 10, dateOn("2026-01-02"))
-	if got := milestoneKeys(NewMilestones(p, next)); !slices.Equal(got, []string{"total-10", "total-30", "night-10"}) {
+	at := func(day string) time.Time { return dateOn(day).Add(9 * time.Hour) }
+	p := saveHours(Profile{}, 5, 0, at("2026-01-01"))
+	next := saveHours(p, 31, 10, at("2026-01-02"))
+	if got := milestoneKeys(NewMilestones(next, at("2026-01-02"))); !slices.Equal(got, []string{"total-10", "total-30", "night-10"}) {
 		t.Fatalf("earned=%v", got)
 	}
 	// Resubmitting, or adding hours short of the next line, celebrates nothing.
-	if got := NewMilestones(next, saveHours(next, 31, 10, dateOn("2026-01-03"))); len(got) != 0 {
+	same := saveHours(next, 31, 10, at("2026-01-03"))
+	if got := NewMilestones(same, at("2026-01-03")); len(got) != 0 {
 		t.Fatalf("unchanged save earned %v", milestoneKeys(got))
 	}
-	if got := NewMilestones(next, saveHours(next, 44.9, 10, dateOn("2026-01-03"))); len(got) != 0 {
+	short := saveHours(next, 44.9, 10, at("2026-01-03"))
+	if got := NewMilestones(short, at("2026-01-03")); len(got) != 0 {
 		t.Fatalf("short save earned %v", milestoneKeys(got))
 	}
 	// A correction below a line is not a milestone; crossing it again is.
-	down := saveHours(next, 29, 10, dateOn("2026-01-03"))
-	if got := NewMilestones(next, down); len(got) != 0 {
+	down := saveHours(next, 29, 10, at("2026-01-03"))
+	if got := NewMilestones(down, at("2026-01-03")); len(got) != 0 {
 		t.Fatalf("correction earned %v", milestoneKeys(got))
 	}
-	if got := milestoneKeys(NewMilestones(down, saveHours(down, 30, 10, dateOn("2026-01-04")))); !slices.Equal(got, []string{"total-30"}) {
+	again := saveHours(down, 30, 10, at("2026-01-04"))
+	if got := milestoneKeys(NewMilestones(again, at("2026-01-04"))); !slices.Equal(got, []string{"total-30"}) {
 		t.Fatalf("re-crossing earned %v", got)
 	}
 	// Hours already present as an undated balance are not newly earned.
 	opening := Profile{TotalHours: 34.5, NightHours: 6}
-	if got := NewMilestones(opening, saveHours(opening, 36, 6, dateOn("2026-01-05"))); len(got) != 0 {
+	if got := NewMilestones(saveHours(opening, 36, 6, at("2026-01-05")), at("2026-01-05")); len(got) != 0 {
 		t.Fatalf("opening balance earned %v", milestoneKeys(got))
+	}
+}
+
+// Two saves can both read the same stored hours. The one that wrote the
+// crossing entry is celebrated; the other, which adds nothing to the journal
+// and gets back the reconciled profile, is not.
+func TestNewMilestonesCelebratesOnlyTheSaveThatWroteTheCrossing(t *testing.T) {
+	first := dateOn("2026-02-01").Add(9 * time.Hour)
+	second := first.Add(time.Second)
+	before := saveHours(Profile{}, 5, 0, dateOn("2026-01-01"))
+	afterFirst := saveHours(before, 10, 0, first)
+	afterSecond := saveHours(afterFirst, 10, 0, second) // Reconciled under the lock: no new entry.
+	if got := milestoneKeys(NewMilestones(afterFirst, first)); !slices.Equal(got, []string{"total-10"}) {
+		t.Fatalf("first save earned %v", got)
+	}
+	if got := NewMilestones(afterSecond, second); len(got) != 0 {
+		t.Fatalf("overlapping save earned %v", milestoneKeys(got))
 	}
 }
