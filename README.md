@@ -67,6 +67,12 @@ Failed logins are limited to 20 per username and, when the real client IP is kno
 
 Usernames must match `^[a-z0-9][a-z0-9_-]{0,31}$`; login trims whitespace and ignores username case. Duplicate usernames are rejected. Bcrypt hashes with `$2a$`, `$2b$`, or `$2y$` prefixes are accepted. The database URL, users list, and session secret support corresponding `*_FILE` variables. Explicit file paths must exist; a missing implicit default users file is allowed.
 
+## Milestone badges
+
+The progress panel shows a badge at 10, 30, 45 and 60 total hours and when night hours reach 10, each dated by the hour entry that crossed the line. Badges follow the recorded cumulative totals shown in the hour gauges, before the weekly credit cap. A correction that drops the totals back below a line removes that badge, and the save that crosses it again gives it the new date. Hours that were already saved before entry dates existed show "Before dates were recorded" instead of a date. Like all entry dates, these are save dates, not actual drive dates.
+
+The save that crosses a milestone also shows a one-time banner. It is part of that save's response only and is not stored, so reloading the page or making another save clears it. Badges are computed from the existing hour journal: there is no migration and no configuration.
+
 ## Dark colour scheme
 
 `static/styles.css` follows the device setting through `prefers-color-scheme: dark`; there is no toggle and no configuration. Surface, text, rating and week-chart colours are custom properties in `:root`, with the dark values in the `@media (prefers-color-scheme: dark)` block. Add a token to both. A test fails when the dark block misses one the light palette defines. The header, odometer, estimate sign, encouragement banner and login splash are dark in both schemes. Text pairs are chosen for WCAG AA (4.5:1) and chart marks and form field borders for 3:1. The home-screen manifest keeps one `background_color`, so an installed app's launch splash stays cream until the page loads.

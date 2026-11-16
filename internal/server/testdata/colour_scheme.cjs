@@ -29,6 +29,7 @@ const probes = [
   { selector: ".checklist-toolbar button:not(.is-selected)", property: "color", token: "--button-ink" },
   { selector: ".checklist-toolbar button:not(.is-selected)", property: "background-color", token: "--button-bg" },
   { selector: ".checklist-reference a", property: "color", token: "--link" },
+  { selector: ".milestone:not(.milestone--reached)", property: "background-color", token: "--surface-soft" },
   { selector: "input[type=date]", property: "background-color", token: "--input-bg" },
   { selector: "input[type=date]", property: "color", token: "--ink" },
 ];

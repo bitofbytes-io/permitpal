@@ -118,7 +118,9 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	}
 
 	slog.Info("profile updated", "total_hours", tracker.Profile.TotalHours, "night_hours", tracker.Profile.NightHours, "has_permit_issue_date", tracker.Profile.PermitIssueDate != nil)
-	render(w, r, ui.ProfileUpdate(model.NewDashboard(driver, tracker.Profile, tracker.Requirements, recordedAt)))
+	dashboard := model.NewDashboard(driver, tracker.Profile, tracker.Requirements, recordedAt)
+	dashboard.Celebrations = model.NewMilestones(tracker.Profile, recordedAt)
+	render(w, r, ui.ProfileUpdate(dashboard))
 }
 
 func (h *DashboardHandler) UpdateRequirement(w http.ResponseWriter, r *http.Request) {
