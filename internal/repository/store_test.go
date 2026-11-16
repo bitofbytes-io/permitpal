@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"strings"
@@ -105,6 +106,56 @@ func TestNewStoreMigratesVersion7PreservingData(t *testing.T) {
 	got, err := store.DriverByUsername(ctx, "before-startup-migration")
 	if err != nil || got.ID != driver.ID {
 		t.Fatalf("driver after migration = %+v (%v), want id %d", got, err, driver.ID)
+	}
+}
+
+func TestInitTimeoutFitsHealthcheckStartPeriod(t *testing.T) {
+	// The Dockerfile and Swarm stack allow 30s before health failures count.
+	if initTimeout != 30*time.Second {
+		t.Fatalf("initTimeout = %v, want the 30s healthcheck start period", initTimeout)
+	}
+}
+
+// The init deadline must bound every step after the ping, including the
+// schema check that runs after migrations, even when the caller's context has
+// no deadline of its own.
+func TestNewPostgresStoreInitDeadlineBoundsEachStep(t *testing.T) {
+	_, databaseURL := testdb.NewEmptyWithURL(t)
+	blockUntilDone := func(ctx context.Context, _ *pgxpool.Pool) error {
+		<-ctx.Done()
+		return ctx.Err()
+	}
+	noop := func(context.Context, *pgxpool.Pool) error { return nil }
+	for _, tc := range []struct {
+		name           string
+		migrate, check func(context.Context, *pgxpool.Pool) error
+		wantStep       string
+	}{
+		{"migration", blockUntilDone, noop, "apply migrations"},
+		{"schema check", noop, blockUntilDone, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			steps := postgresInit{timeout: 200 * time.Millisecond, migrate: tc.migrate, check: tc.check}
+			done := make(chan error, 1)
+			go func() {
+				_, closeStore, err := newPostgresStore(context.Background(), databaseURL, steps)
+				if err == nil {
+					closeStore()
+				}
+				done <- err
+			}()
+			select {
+			case err := <-done:
+				if !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("newPostgresStore error = %v, want deadline exceeded", err)
+				}
+				if tc.wantStep != "" && !strings.Contains(err.Error(), tc.wantStep) {
+					t.Fatalf("error %q does not name the %s step", err, tc.wantStep)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("startup step was not bounded by the init deadline")
+			}
+		})
 	}
 }
 

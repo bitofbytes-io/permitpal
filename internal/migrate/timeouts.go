@@ -9,21 +9,42 @@ import (
 	"github.com/pressly/goose/v3/lock"
 )
 
-// migrationTimeouts separates the overall startup deadline from lock and cleanup limits.
+// StartupTimeout is the deadline Apply gives all Goose work: connection
+// acquisition, lock waiting, the migrations themselves and the final version
+// read. repository.NewStore adds its connect budget to it.
+const StartupTimeout = 20 * time.Second
+
+// migrationTimeouts separates the overall startup deadline from lock and
+// cleanup limits. lockID selects the Postgres advisory lock; zero means Goose's
+// default ID, which production always uses so every replica (and the goose CLI
+// behind `make migrate`) contends on the same lock. Tests set a unique ID so
+// concurrently running test packages cannot hold or wait on each other's lock.
 type migrationTimeouts struct {
 	total, lock, unlock time.Duration
+	lockID              int64
 }
 
-// Keep the budgets inside the Swarm healthcheck start period (30s, also the
-// Dockerfile's HEALTHCHECK --start-period): store connect 10s (repository.NewStore)
-// + migrate 20s = 30s before the server listens. A replica waiting on another
-// replica's migration gives up after 15s of lock wait, well inside the total,
-// and exits non-zero so Swarm rolls the update back instead of holding a
-// replica that never serves. The unlock allowance is cleanup after the work
-// is done (or abandoned); it takes milliseconds on success and only runs to
-// its limit when the connection is already broken.
+// sessionLockID returns the advisory lock ID, defaulting to Goose's.
+func (t migrationTimeouts) sessionLockID() int64 {
+	if t.lockID == 0 {
+		return lock.DefaultLockID
+	}
+	return t.lockID
+}
+
+// The startup budget fits the Swarm healthcheck start period (30s, also the
+// Dockerfile's HEALTHCHECK --start-period). One shared 30s deadline, set in
+// repository.NewStore, covers connecting (at most 10s), Apply (at most
+// StartupTimeout, 20s: lock wait, migrations and the final version read) and the
+// post-migration schema check. A replica waiting on another replica's migration
+// gives up after 15s of lock wait, well inside the total, and exits non-zero so
+// Swarm rolls the update back instead of holding a replica that never serves.
+// The unlock allowance is cleanup outside that deadline: it runs after the work
+// is done or abandoned, with its own 5s limit, so exit can come up to 5s after
+// the 30s. It takes milliseconds on success and only runs to its limit when the
+// connection is already broken.
 var startupTimeouts = migrationTimeouts{
-	total:  20 * time.Second,
+	total:  StartupTimeout,
 	lock:   15 * time.Second,
 	unlock: 5 * time.Second,
 }

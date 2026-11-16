@@ -2,6 +2,8 @@ package migrate
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -13,9 +15,36 @@ import (
 	"github.com/drywaters/permitpal/internal/testdb"
 	"github.com/drywaters/permitpal/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/pressly/goose/v3/lock"
 )
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+// testTimeouts returns the production budgets with an advisory lock ID unique
+// to this call. Advisory locks are database-wide, not per schema, so tests in
+// other packages (and process-level startup tests) running in parallel would
+// otherwise hold or wait on the production lock ID and skew any test with a
+// short deadline. Production itself always uses Goose's default ID.
+func testTimeouts(t *testing.T) migrationTimeouts {
+	t.Helper()
+	var random [8]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		t.Fatal(err)
+	}
+	id := int64(binary.BigEndian.Uint64(random[:]) >> 1)
+	if id == 0 || id == lock.DefaultLockID {
+		id = 1
+	}
+	timeouts := startupTimeouts
+	timeouts.lockID = id
+	return timeouts
+}
+
+// applyIsolated applies fsys under the production budgets and a private lock ID.
+func applyIsolated(t *testing.T, ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
+	t.Helper()
+	return applyWithTimeouts(ctx, pool, fsys, discard, testTimeouts(t))
+}
 
 // migrationFS copies the embedded migrations, keeping files accepted by keep,
 // and adds extra files.
@@ -107,7 +136,7 @@ func TestApplyOnlyRunsPendingMigrations(t *testing.T) {
 	}
 	latest := names[len(names)-1]
 	old := migrationFS(t, func(name string) bool { return name != latest }, nil)
-	if err := apply(ctx, pool, old, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, old); err != nil {
 		t.Fatalf("apply all but %s: %v", latest, err)
 	}
 	if got := appliedVersions(t, pool); len(got) != len(names)-1 {
@@ -115,7 +144,7 @@ func TestApplyOnlyRunsPendingMigrations(t *testing.T) {
 	}
 
 	// Re-running earlier files would fail (for example CREATE TABLE drivers).
-	if err := Apply(ctx, pool, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, migrations.Files); err != nil {
 		t.Fatalf("apply latest: %v", err)
 	}
 	if got := appliedVersions(t, pool); len(got) != len(names) {
@@ -130,7 +159,7 @@ func TestApplyNewMigrationAndToleratesNewerDatabase(t *testing.T) {
 	next := migrationFS(t, nil, map[string]string{
 		"999_noop.sql": "-- +goose Up\nSELECT 1;\n\n-- +goose Down\nSELECT 1;\n",
 	})
-	if err := apply(ctx, pool, next, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, next); err != nil {
 		t.Fatalf("apply with extra migration: %v", err)
 	}
 	got := appliedVersions(t, pool)
@@ -139,7 +168,7 @@ func TestApplyNewMigrationAndToleratesNewerDatabase(t *testing.T) {
 	}
 
 	// Rolling back to an image without 999 must still start.
-	if err := Apply(ctx, pool, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, migrations.Files); err != nil {
 		t.Fatalf("apply older file set: %v", err)
 	}
 }
@@ -151,7 +180,7 @@ func TestApplyFailsOnBrokenMigration(t *testing.T) {
 	broken := migrationFS(t, nil, map[string]string{
 		"999_broken.sql": "-- +goose Up\nSELECT * FROM table_that_does_not_exist;\n",
 	})
-	err := apply(ctx, pool, broken, discard)
+	err := applyIsolated(t, ctx, pool, broken)
 	if err == nil || !strings.Contains(err.Error(), "999_broken.sql") {
 		t.Fatalf("apply error = %v, want failure naming 999_broken.sql", err)
 	}
@@ -166,6 +195,7 @@ func TestApplyConcurrentStartups(t *testing.T) {
 	ctx := context.Background()
 
 	const replicas = 3
+	opts := testTimeouts(t)
 	errs := make([]error, replicas)
 	var wg sync.WaitGroup
 	for i := range replicas {
@@ -177,7 +207,7 @@ func TestApplyConcurrentStartups(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			errs[i] = Apply(ctx, replica, discard)
+			errs[i] = applyWithTimeouts(ctx, replica, migrations.Files, discard, opts)
 		}()
 	}
 	wg.Wait()
@@ -199,7 +229,7 @@ func TestApplyUpgradesVersion7PreservingData(t *testing.T) {
 	ctx := context.Background()
 
 	upTo7 := migrationFS(t, func(name string) bool { return name < "008" }, nil)
-	if err := apply(ctx, pool, upTo7, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, upTo7); err != nil {
 		t.Fatalf("apply through 007: %v", err)
 	}
 	if got := appliedVersions(t, pool); len(got) != 7 || got[6] != 7 {
@@ -213,7 +243,7 @@ func TestApplyUpgradesVersion7PreservingData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := Apply(ctx, pool, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, migrations.Files); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	got := appliedVersions(t, pool)

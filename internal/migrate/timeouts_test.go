@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/drywaters/permitpal/internal/testdb"
+	"github.com/drywaters/permitpal/migrations"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3/lock"
 )
@@ -17,7 +18,11 @@ func testApply(ctx context.Context, pool *pgxpool.Pool, fsys fstest.MapFS, timeo
 	return applyWithTimeouts(ctx, pool, fsys, discard, timeouts)
 }
 
-func holdMigrationLock(t *testing.T, pool *pgxpool.Pool) func() {
+// holdMigrationLock holds the advisory lock lockID on its own connection until
+// the returned release func runs (or the test ends). Pass a testTimeouts ID,
+// never the production one: advisory locks are database-wide, so holding the
+// default ID would stall tests in other packages.
+func holdMigrationLock(t *testing.T, pool *pgxpool.Pool, lockID int64) func() {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -25,7 +30,7 @@ func holdMigrationLock(t *testing.T, pool *pgxpool.Pool) func() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", lock.DefaultLockID); err != nil {
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", lockID); err != nil {
 		conn.Release()
 		t.Fatal(err)
 	}
@@ -37,7 +42,7 @@ func holdMigrationLock(t *testing.T, pool *pgxpool.Pool) func() {
 		released = true
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		_, err := conn.Exec(ctx, "SELECT pg_advisory_unlock($1)", lock.DefaultLockID)
+		_, err := conn.Exec(ctx, "SELECT pg_advisory_unlock($1)", lockID)
 		conn.Release()
 		if err != nil {
 			t.Error(err)
@@ -51,8 +56,9 @@ func TestApplyLockWaitIsBounded(t *testing.T) {
 	for _, mode := range []string{"lock deadline", "total deadline", "caller cancellation"} {
 		t.Run(mode, func(t *testing.T) {
 			pool := testdb.NewEmpty(t)
-			release := holdMigrationLock(t, pool)
-			timeouts := migrationTimeouts{total: 3 * time.Second, lock: 3 * time.Second, unlock: time.Second}
+			timeouts := testTimeouts(t)
+			timeouts.total, timeouts.lock, timeouts.unlock = 3*time.Second, 3*time.Second, time.Second
+			release := holdMigrationLock(t, pool, timeouts.lockID)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			wantErr := context.DeadlineExceeded
@@ -92,7 +98,9 @@ func TestApplyLockWaitIsBounded(t *testing.T) {
 				t.Fatal("lock waiter executed migration DDL")
 			}
 			release()
-			if err := testApply(context.Background(), pool, fsys, startupTimeouts); err != nil {
+			retry := startupTimeouts
+			retry.lockID = timeouts.lockID
+			if err := testApply(context.Background(), pool, fsys, retry); err != nil {
 				t.Fatalf("retry after releasing lock: %v", err)
 			}
 			if got := appliedVersions(t, pool); len(got) != 1 || got[0] != 1 {
@@ -107,14 +115,19 @@ func TestApplyInterruptedSQLRollsBackAndReleasesLock(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			pool := testdb.NewEmpty(t)
 			first := fstest.MapFS{"001_probe.sql": {Data: []byte("-- +goose Up\nCREATE TABLE deadline_probe (id INT);\n")}}
-			if err := testApply(context.Background(), pool, first, startupTimeouts); err != nil {
+			// A private lock ID keeps this test's short deadline independent of
+			// other packages that migrate (and so hold the shared lock) concurrently.
+			timeouts := testTimeouts(t)
+			if err := testApply(context.Background(), pool, first, timeouts); err != nil {
 				t.Fatal(err)
 			}
 			pending := fstest.MapFS{
 				"001_probe.sql": first["001_probe.sql"],
 				"002_slow.sql":  {Data: []byte("-- +goose Up\nALTER TABLE deadline_probe ADD COLUMN note TEXT;\nSELECT pg_sleep(10) /* migration_cancel_probe */;\n")},
 			}
-			timeouts := migrationTimeouts{total: 500 * time.Millisecond, lock: time.Second, unlock: time.Second}
+			// The slow SQL sleeps far longer than the deadline, which leaves
+			// ample margin to observe it start before the deadline expires.
+			timeouts.total, timeouts.lock, timeouts.unlock = 1500*time.Millisecond, time.Second, time.Second
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			wantErr := context.DeadlineExceeded
@@ -155,10 +168,10 @@ func TestApplyInterruptedSQLRollsBackAndReleasesLock(t *testing.T) {
 				if !errors.Is(err, wantErr) {
 					t.Fatalf("apply error = %v, want %v", err, wantErr)
 				}
-			case <-time.After(3 * time.Second):
+			case <-time.After(5 * time.Second):
 				t.Fatal("interrupted migration did not stop")
 			}
-			if elapsed := time.Since(start); elapsed > 3*time.Second {
+			if elapsed := time.Since(start); elapsed > 4*time.Second {
 				t.Fatalf("migration exceeded test budget: %v", elapsed)
 			}
 			if got := appliedVersions(t, pool); len(got) != 1 || got[0] != 1 {
@@ -180,7 +193,9 @@ func TestApplyInterruptedSQLRollsBackAndReleasesLock(t *testing.T) {
 			defer retryPool.Close()
 			retryCtx, stopRetry := context.WithTimeout(context.Background(), 3*time.Second)
 			defer stopRetry()
-			if err := testApply(retryCtx, retryPool, pending, startupTimeouts); err != nil {
+			retry := startupTimeouts
+			retry.lockID = timeouts.lockID
+			if err := testApply(retryCtx, retryPool, pending, retry); err != nil {
 				t.Fatalf("retry after interruption: %v", err)
 			}
 			if got := appliedVersions(t, pool); len(got) != 2 || got[1] != 2 {
@@ -224,11 +239,12 @@ func TestLockerBoundsDetachedCleanup(t *testing.T) {
 
 func TestApplyWaitsForAdvisoryLock(t *testing.T) {
 	pool := testdb.NewEmpty(t)
-	release := holdMigrationLock(t, pool)
+	timeouts := testTimeouts(t)
+	release := holdMigrationLock(t, pool, timeouts.lockID)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- Apply(ctx, pool, discard) }()
+	go func() { done <- applyWithTimeouts(ctx, pool, migrations.Files, discard, timeouts) }()
 	select {
 	case err := <-done:
 		t.Fatalf("Apply finished while the lock was held: %v", err)
@@ -257,6 +273,34 @@ func TestStartupBudgetsFitHealthcheckStartPeriod(t *testing.T) {
 	}
 	if startupTimeouts.lock >= startupTimeouts.total {
 		t.Fatalf("lock budget %v must be below the total %v", startupTimeouts.lock, startupTimeouts.total)
+	}
+}
+
+func TestProductionUsesGooseDefaultLockID(t *testing.T) {
+	// Every replica, and the goose CLI behind `make migrate`, must contend on
+	// one lock. Only tests override the ID.
+	if got := startupTimeouts.sessionLockID(); got != lock.DefaultLockID {
+		t.Fatalf("production lock ID = %d, want goose default %d", got, lock.DefaultLockID)
+	}
+	if got := (migrationTimeouts{}).sessionLockID(); got != lock.DefaultLockID {
+		t.Fatalf("zero lockID resolves to %d, want goose default %d", got, lock.DefaultLockID)
+	}
+}
+
+func TestApplyLockIDsAreIndependent(t *testing.T) {
+	pool := testdb.NewEmpty(t)
+	held, other := testTimeouts(t), testTimeouts(t)
+	if held.lockID == other.lockID {
+		t.Fatal("testTimeouts returned the same lock ID twice")
+	}
+	holdMigrationLock(t, pool, held.lockID)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := applyWithTimeouts(ctx, pool, migrations.Files, discard, other); err != nil {
+		t.Fatalf("apply under a different lock ID waited on another holder: %v", err)
+	}
+	if got := appliedVersions(t, pool); len(got) != embeddedCount(t) {
+		t.Fatalf("versions = %v, want all embedded versions", got)
 	}
 }
 

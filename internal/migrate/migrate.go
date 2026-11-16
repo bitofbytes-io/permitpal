@@ -41,6 +41,7 @@ func applyWithTimeouts(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS, logg
 		}
 	}()
 	locker, err := lock.NewPostgresSessionLocker(
+		lock.WithLockID(timeouts.sessionLockID()),
 		lock.WithLockTimeout(1, retryCount(timeouts.lock)),
 		lock.WithUnlockTimeout(1, retryCount(timeouts.unlock)),
 	)

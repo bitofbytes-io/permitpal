@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -62,12 +61,9 @@ func NewEmptyWithURL(t *testing.T) (*pgxpool.Pool, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	u, err := url.Parse(databaseURL)
+	schemaURL, err := SetConnParam(databaseURL, "search_path", cfg.ConnConfig.RuntimeParams["search_path"])
 	if err != nil {
 		t.Fatal(err)
 	}
-	query := u.Query()
-	query.Set("search_path", cfg.ConnConfig.RuntimeParams["search_path"])
-	u.RawQuery = query.Encode()
-	return pool, u.String()
+	return pool, schemaURL
 }

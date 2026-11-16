@@ -19,21 +19,22 @@ func (write migrationLogWriter) Write(p []byte) (int, error) { return write(p) }
 
 func TestApplyDoesNotReacquireLockForVersionLog(t *testing.T) {
 	pool := testdb.NewEmpty(t)
+	timeouts := testTimeouts(t)
+	timeouts.total, timeouts.lock, timeouts.unlock = 3*time.Second, 2*time.Second, time.Second
 	var release func()
 	logger := slog.New(slog.NewTextHandler(migrationLogWriter(func(p []byte) (int, error) {
 		if release == nil && strings.Contains(string(p), "migration applied") {
 			// Simulate another replica acquiring the lock after our migration ends.
 			// If the version read reacquires it, Apply will exhaust the short budget.
-			release = holdMigrationLock(t, pool)
+			release = holdMigrationLock(t, pool, timeouts.lockID)
 		}
 		return len(p), nil
 	}), nil))
 
 	fsys := fstest.MapFS{"001_probe.sql": {Data: []byte("-- +goose Up\nCREATE TABLE version_log_probe (id INT);\n")}}
-	// The lock budget is generous enough that a replica in another test package
-	// briefly holding the shared advisory lock cannot fail the first apply, yet
-	// short enough that a second acquisition would exhaust the total budget.
-	timeouts := migrationTimeouts{total: 3 * time.Second, lock: 2 * time.Second, unlock: time.Second}
+	// A private lock ID keeps other packages' migrations out of this budget; a
+	// second acquisition would wait on the competing holder until it exhausts
+	// the lock wait.
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	if err := applyWithTimeouts(ctx, pool, fsys, logger, timeouts); err != nil {

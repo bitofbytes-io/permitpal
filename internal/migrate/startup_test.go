@@ -61,13 +61,25 @@ func buildPermitpal(t *testing.T) string {
 	return binary
 }
 
+// childDatabaseURL names the child's connections appName so the test can find
+// them in pg_stat_activity. application_name is set in the connection string
+// itself because a value already present there (from PERMITPAL_TEST_DATABASE_URL)
+// would override the PGAPPNAME environment variable.
+func childDatabaseURL(t *testing.T, databaseURL, appName string) string {
+	t.Helper()
+	childURL, err := testdb.SetConnParam(databaseURL, "application_name", appName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return childURL
+}
+
 // startPermitpal starts the binary against databaseURL with synthetic app
 // secrets only, so it cannot read local or deployment configuration.
-func startPermitpal(ctx context.Context, t *testing.T, binary, databaseURL, appName, port string) (*exec.Cmd, *syncBuffer) {
+func startPermitpal(ctx context.Context, t *testing.T, binary, databaseURL, port string) (*exec.Cmd, *syncBuffer) {
 	t.Helper()
 	command := exec.CommandContext(ctx, binary) // #nosec G204 -- binary was built from this repository into t.TempDir.
 	command.Env = []string{
-		"PGAPPNAME=" + appName,
 		"APP_ENV=development",
 		"DATA_STORE=postgres",
 		"SECURE_COOKIES=false",
@@ -104,7 +116,8 @@ func TestSIGTERMDuringMigrationLockWaitExitsNonzero(t *testing.T) {
 		_, _ = holder.Exec(cleanupCtx, "SELECT pg_advisory_unlock($1)", lock.DefaultLockID)
 	}()
 
-	command, output := startPermitpal(ctx, t, binary, databaseURL, "permitpal_startup_signal_test", freePort(t))
+	childURL := childDatabaseURL(t, databaseURL, "permitpal_startup_signal_test")
+	command, output := startPermitpal(ctx, t, binary, childURL, freePort(t))
 	waited := false
 	defer func() {
 		if !waited {
@@ -140,7 +153,7 @@ func TestSIGTERMDuringMigrationLockWaitExitsNonzero(t *testing.T) {
 	if !strings.Contains(output.String(), "migrate: startup interrupted: context canceled") {
 		t.Fatalf("startup did not log a clear cancellation reason: %s", output)
 	}
-	if strings.Contains(output.String(), databaseURL) || strings.Contains(output.String(), startupTestSecret) {
+	if strings.Contains(output.String(), childURL) || strings.Contains(output.String(), startupTestSecret) {
 		t.Fatal("startup log included credentials")
 	}
 }
@@ -153,7 +166,7 @@ func TestStartupMigratesVersion7AndServes(t *testing.T) {
 
 	// The state the production database was in before BOB-310 shipped.
 	upTo7 := migrationFS(t, func(name string) bool { return name < "008" }, nil)
-	if err := apply(ctx, pool, upTo7, discard); err != nil {
+	if err := applyIsolated(t, ctx, pool, upTo7); err != nil {
 		t.Fatalf("apply through 007: %v", err)
 	}
 	if got := appliedVersions(t, pool); len(got) != 7 {
@@ -161,7 +174,8 @@ func TestStartupMigratesVersion7AndServes(t *testing.T) {
 	}
 
 	port := freePort(t)
-	command, output := startPermitpal(ctx, t, binary, databaseURL, "permitpal_startup_serve_test", port)
+	childURL := childDatabaseURL(t, databaseURL, "permitpal_startup_serve_test")
+	command, output := startPermitpal(ctx, t, binary, childURL, port)
 	exited := make(chan struct{})
 	var waitErr error
 	go func() {
@@ -210,7 +224,7 @@ func TestStartupMigratesVersion7AndServes(t *testing.T) {
 	if !strings.Contains(output.String(), "008_road_test_date.sql") {
 		t.Fatalf("startup did not log migration 008: %s", output)
 	}
-	if strings.Contains(output.String(), databaseURL) || strings.Contains(output.String(), startupTestSecret) {
+	if strings.Contains(output.String(), childURL) || strings.Contains(output.String(), startupTestSecret) {
 		t.Fatal("startup log included credentials")
 	}
 }
