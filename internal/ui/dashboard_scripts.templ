@@ -47,11 +47,6 @@ templ SaveFeedbackScript() {
 			var error = form.querySelector(".form-error");
 			error.hidden = true;
 			error.textContent = "";
-			// A milestone celebration is one-time: any later save, skill or hours, ends it.
-			var banner = document.querySelector("#progress-panel .milestone-banner");
-			if (banner) {
-				banner.remove();
-			}
 			if (form.id === "progress-form") {
 				var progressSaved = document.querySelector("#progress-panel .save-feedback");
 				if (progressSaved) {
@@ -106,9 +101,20 @@ templ SaveFeedbackScript() {
 			}
 			var xhr = event.detail.xhr;
 			clearFeedback(form);
+			// A milestone celebration is one-time: a later successful save, skill
+			// or hours, ends it. A rejected or failed save keeps the banner. Only
+			// the banner present before this request goes, so one rendered by
+			// this save's own response stays.
+			var banner = document.querySelector("#progress-panel .milestone-banner");
 			// htmx handles the response first: it swaps the row on success and
 			// re-enables a rejected row's controls.
 			xhr.addEventListener("load", function () {
+				if (xhr.status >= 200 && xhr.status < 300) {
+					if (banner && banner.isConnected) {
+						banner.remove();
+					}
+					return;
+				}
 				if (xhr.status !== 400) {
 					return;
 				}

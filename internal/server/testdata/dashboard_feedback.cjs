@@ -469,7 +469,19 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
         // The save that crossed 10 hours shows the one-time banner. A skill
         // save, which does not replace the progress panel, ends it.
         assert.equal(await panel.locator(".milestone-banner").count(), 1, "crossing 10 hours was not celebrated");
+        // A save that is rejected or never arrives keeps the earned banner.
         await other.locator("[name=notes]").fill("After the celebration");
+        await page.route("**/requirements/quick-stop", (route) =>
+          route.fulfill({ status: 400, contentType: "text/plain; charset=utf-8", body: "Rejected\n" }),
+        );
+        await update(other, "Quick stop");
+        assert.deepEqual(await alerts(other), ["Rejected"]);
+        assert.equal(await panel.locator(".milestone-banner").count(), 1, "a rejected save removed the milestone banner");
+        await page.unrouteAll();
+        await page.route("**/requirements/quick-stop", (route) => route.abort());
+        await update(other, "Quick stop");
+        assert.equal(await panel.locator(".milestone-banner").count(), 1, "a failed save removed the milestone banner");
+        await page.unrouteAll();
         await update(other, "Quick stop");
         assert.deepEqual(await statuses(other), ["Saved"]);
         assert.equal(await panel.locator(".milestone-banner").count(), 0, "a skill save left the milestone banner");
