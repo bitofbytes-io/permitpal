@@ -118,9 +118,13 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	profile.TotalHours = totalHours
 	profile.NightHours = nightHours
 	profile.PermitIssueDate = permitIssueDate
-	// A form from before this field existed leaves the saved appointment alone.
+	// A form from before this field existed leaves the saved appointment
+	// alone. The store keeps it under its own lock, so an appointment saved
+	// after the read above is not overwritten with this stale copy.
 	if r.PostForm.Has("road_test_date") {
 		profile.RoadTestDate = roadTestDate
+	} else {
+		profile.KeepRoadTestDate = true
 	}
 
 	tracker.Profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile, recordedAt)
