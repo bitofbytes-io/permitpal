@@ -125,7 +125,20 @@ func ProgressForm(dashboard model.Dashboard) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><p class=\"entry-note\">Keep recording current totals beyond 60 total and 10 night hours when needed. Increases count in the Monday–Sunday week saved, using the entry date rather than the drive date. Corrections remove the newest matching hours first.</p><button type=\"submit\">Save progress</button><p class=\"form-error\" role=\"alert\" hidden></p></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"> <label for=\"road_test_date\">Road test appointment (optional)</label> <input id=\"road_test_date\" name=\"road_test_date\" type=\"date\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(model.DateValue(dashboard.Profile.RoadTestDate)).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/progress_form.templ`, Line: 26, Col: 117}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"><p class=\"entry-note\">Keep recording current totals beyond 60 total and 10 night hours when needed. Increases count in the Monday–Sunday week saved, using the entry date rather than the drive date. Corrections remove the newest matching hours first.</p><button type=\"submit\">Save progress</button><p class=\"form-error\" role=\"alert\" hidden></p></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -42,10 +42,12 @@ func NewDriver(username string) Driver {
 
 type Profile struct {
 	PermitIssueDate *time.Time
-	TotalHours      float64
-	NightHours      float64
-	UpdatedAt       time.Time
-	HourEntries     []HourEntry
+	// RoadTestDate is the optional road-test appointment date.
+	RoadTestDate *time.Time
+	TotalHours   float64
+	NightHours   float64
+	UpdatedAt    time.Time
+	HourEntries  []HourEntry
 }
 
 // Tracker is one driver's stored progress: hours, permit date and skill ratings.

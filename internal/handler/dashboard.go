@@ -100,6 +100,14 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// The appointment may be in the past and is only warned about, never
+	// rejected, so a date that has since passed does not block other saves.
+	roadTestDate, err := model.ParseDate(r.FormValue("road_test_date"), h.loc)
+	if err != nil {
+		http.Error(w, "Road test appointment must be a valid date in YYYY-MM-DD format", http.StatusBadRequest)
+		return
+	}
+
 	tracker, err := h.store.GetTracker(r.Context(), driver.ID)
 	if err != nil {
 		middleware.ServerError(w, r, "Unable to load profile", err)
@@ -110,6 +118,10 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 	profile.TotalHours = totalHours
 	profile.NightHours = nightHours
 	profile.PermitIssueDate = permitIssueDate
+	// A form from before this field existed leaves the saved appointment alone.
+	if r.PostForm.Has("road_test_date") {
+		profile.RoadTestDate = roadTestDate
+	}
 
 	tracker.Profile, err = h.store.UpdateProfile(r.Context(), driver.ID, profile, recordedAt)
 	if err != nil {
@@ -117,7 +129,7 @@ func (h *DashboardHandler) UpdateProfile(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	slog.Info("profile updated", "total_hours", tracker.Profile.TotalHours, "night_hours", tracker.Profile.NightHours, "has_permit_issue_date", tracker.Profile.PermitIssueDate != nil)
+	slog.Info("profile updated", "total_hours", tracker.Profile.TotalHours, "night_hours", tracker.Profile.NightHours, "has_permit_issue_date", tracker.Profile.PermitIssueDate != nil, "has_road_test_date", tracker.Profile.RoadTestDate != nil)
 	render(w, r, ui.ProfileUpdate(model.NewDashboard(driver, tracker.Profile, tracker.Requirements, recordedAt)))
 }
 

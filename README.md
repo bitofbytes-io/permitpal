@@ -6,6 +6,10 @@ Ready estimates retain the observed pace of manually entered cumulative total an
 
 Repeated unchanged submissions and permit-date-only changes create no hour entry. Corrections reverse the newest matching day/night hours first, then undated opening hours; moving daytime hours to night records the new night classification on the save date. Previously saved totals remain an explicitly undated, unverified opening balance without invented historical weeks. Writes by an older binary during rollout are likewise reconciled as undated changes. Migration 007 adds this journal while preserving cumulative profile totals; apply it before deploying the new binary. Reverting the binary retains current totals, but rolling back migration 007 discards entry-date history while retaining cumulative totals and their expanded input bounds. An older binary still enforces its old 60/10 input limits; do not reduce recorded totals to satisfy them.
 
+## Road-test appointment
+
+The progress form takes an optional road-test appointment date. The dashboard's "What's left" panel counts down to it and warns when the date is before the permit hold ends, or when the 60 total or 10 night credited hours will not be reached by then at the observed pace, including the weekly cap. Without a permit issue date the warnings cannot be checked, so the panel asks for one. A date that has passed shows "Date has passed" without warnings. Leaving the field empty clears the appointment. The warnings are estimates, not a check against the DMV. Migration 008 adds the nullable `app_profile.road_test_date` column; apply it before deploying the new binary. The previous release keeps working on the migrated schema, and rolling the migration back discards saved appointments. No new configuration is needed.
+
 ## Requirements
 
 - Docker 24+

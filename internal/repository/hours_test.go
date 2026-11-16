@@ -170,7 +170,7 @@ func TestHourEntryMigrationPreservesLegacyAndReconcilesOldWriter(t *testing.T) {
 	if _, err = pool.Exec(ctx, `alter table app_profile drop constraint app_profile_night_hours_within_total; update app_profile set total_hours=3,night_hours=5; alter table app_profile add constraint app_profile_night_hours_within_total check (night_hours<=total_hours) not valid`); err != nil {
 		t.Fatal(err)
 	}
-	migrate(t, pool, 7, 7)
+	migrate(t, pool, 7, SchemaVersion)
 	tracker, err := store.GetTracker(ctx, driver.ID)
 	if err != nil {
 		t.Fatal(err)

@@ -63,6 +63,10 @@ func copyProfile(profile model.Profile) model.Profile {
 		date := *profile.PermitIssueDate
 		profile.PermitIssueDate = &date
 	}
+	if profile.RoadTestDate != nil {
+		date := *profile.RoadTestDate
+		profile.RoadTestDate = &date
+	}
 	return profile
 }
 func copyRequirement(req model.Requirement) model.Requirement {
