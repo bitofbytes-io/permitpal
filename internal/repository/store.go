@@ -3,10 +3,12 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"time"
 
 	"github.com/drywaters/permitpal/internal/config"
+	dbmigrate "github.com/drywaters/permitpal/internal/migrate"
 	"github.com/drywaters/permitpal/internal/model"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,6 +28,10 @@ type Store interface {
 
 type CloseFunc func()
 
+// connectTimeout bounds the first database connection. It is the first part of
+// the startup budget described in internal/migrate/timeouts.go.
+const connectTimeout = 10 * time.Second
+
 func NewStore(ctx context.Context, cfg *config.Config) (Store, CloseFunc, error) {
 	switch cfg.DataStore {
 	case config.DataStoreMemory:
@@ -35,10 +41,20 @@ func NewStore(ctx context.Context, cfg *config.Config) (Store, CloseFunc, error)
 		if err != nil {
 			return nil, nil, fmt.Errorf("connect postgres: %w", err)
 		}
-		if err := pool.Ping(ctx); err != nil {
+		pingCtx, cancel := context.WithTimeout(ctx, connectTimeout)
+		err = pool.Ping(pingCtx)
+		cancel()
+		if err != nil {
 			pool.Close()
 			return nil, nil, fmt.Errorf("ping postgres: %w", err)
 		}
+		// Apply the embedded migrations before serving. A failure stops startup,
+		// so the new task never becomes healthy and Swarm rolls the update back.
+		if err := dbmigrate.Apply(ctx, pool, slog.Default()); err != nil {
+			pool.Close()
+			return nil, nil, fmt.Errorf("apply migrations: %w", err)
+		}
+		// Safety net: the database must now be at the version this binary needs.
 		if err := CheckSchemaVersion(ctx, pool); err != nil {
 			pool.Close()
 			return nil, nil, err

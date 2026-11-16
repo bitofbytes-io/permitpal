@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 	"time"
 
 	"github.com/drywaters/permitpal/internal/model"
-	"github.com/jackc/pgx/v5"
+	"github.com/drywaters/permitpal/internal/testdb"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -73,41 +72,7 @@ func TestCheckSchemaVersion(t *testing.T) {
 
 func testSchemaPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	databaseURL := os.Getenv("PERMITPAL_TEST_DATABASE_URL")
-	if databaseURL == "" {
-		t.Skip("PERMITPAL_TEST_DATABASE_URL is not set")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	admin, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(admin.Close)
-	var random [8]byte
-	if _, err := rand.Read(random[:]); err != nil {
-		t.Fatal(err)
-	}
-	schema := pgx.Identifier{fmt.Sprintf("permitpal_test_%x", random)}.Sanitize()
-	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if _, err := admin.Exec(context.Background(), "DROP SCHEMA "+schema+" CASCADE"); err != nil {
-			t.Errorf("drop test schema: %v", err)
-		}
-	})
-	cfg, err := pgxpool.ParseConfig(databaseURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cfg.ConnConfig.RuntimeParams["search_path"] = strings.Trim(schema, `"`)
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
+	return testdb.NewEmpty(t)
 }
 
 // migrate applies the Up section of every migration from first through last.

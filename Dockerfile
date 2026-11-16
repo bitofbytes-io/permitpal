@@ -17,7 +17,6 @@ RUN apk add --no-cache ca-certificates
 
 COPY --from=builder /out/permitpal ./permitpal
 COPY --from=builder /src/static ./static
-COPY --from=builder /src/migrations ./migrations
 
 RUN addgroup -S permitpal \
 	&& adduser -S -G permitpal permitpal \
@@ -31,5 +30,5 @@ ENV SESSION_SECRET_FILE=/run/secrets/permitpal_session_secret
 
 USER permitpal
 EXPOSE 4600
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -q -O - "http://127.0.0.1:${PORT:-4600}/health" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD wget -q -O - "http://127.0.0.1:${PORT:-4600}/health" || exit 1
 CMD ["./permitpal"]

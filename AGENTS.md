@@ -4,6 +4,7 @@
 - The Content Security Policy allows only same-origin scripts and inline scripts carrying the request nonce: give every inline `<script>` `nonce={ templ.GetNonce(ctx) }`, and do not add inline event handlers or third-party script hosts.
 - Keep the memory store as an ephemeral preview path and use Postgres behavior as the production reference.
 - The Docker image sets production database and session-secret file paths; memory-mode container runs must clear `DATABASE_URL_FILE` and pass `SESSION_SECRET` directly.
+- With `DATA_STORE=postgres` the binary applies the embedded `migrations/*.sql` at startup under a Postgres advisory lock, and `make migrate` shares its `goose_db_version` table. Keep migrations additive and compatible with the previous release (start-first rollouts), and bump `repository.SchemaVersion` with each new one.
 - Accounts come only from `PERMITPAL_USERS` or `PERMITPAL_USERS_FILE` as `username:bcrypthash` lines; sessions need a secret of at least 32 characters.
 - Preserve secure-cookie defaults: enabled in production and disabled only for local HTTP development.
 - Run `make test` and exercise both storage modes when changing repository or configuration behavior.
