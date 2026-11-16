@@ -1,6 +1,7 @@
 @import 'https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Patrick+Hand&family=Road+Rage&display=swap';
 
 :root {
+  color-scheme: light dark;
   --blacktop: #0d1113;
   --asphalt: #1d2627;
   --asphalt-soft: #283434;
@@ -17,6 +18,137 @@
   --wood: #8b552c;
   --shadow: 0 16px 36px rgba(25, 21, 13, 0.22);
   --ring: rgba(246, 195, 24, 0.45);
+
+  /* Surfaces and text that change with the colour scheme. The header, odometer,
+     road meter, estimate sign and encouragement banner are dark in both schemes. */
+  --page-top: #fffaf0;
+  --page-bottom: #efe3ca;
+  --surface: rgba(255, 253, 247, 0.94);
+  --surface-solid: #fffdf8;
+  --surface-soft: rgba(255, 253, 247, 0.85);
+  --surface-table: rgba(255, 253, 247, 0.82);
+  --surface-row: rgba(255, 252, 245, 0.72);
+  --surface-values: rgba(255, 253, 247, 0.72);
+  --sheet: #fffaf0;
+  --sheet-grid: rgba(40, 30, 15, 0.08);
+  --head-bg: #f6efe2;
+  --head-ink: #222;
+  --panel-line: #d6cab5;
+  --divider: #d1c5af;
+  --divider-soft: #e3d8c3;
+  --input-bg: rgba(255, 253, 247, 0.94);
+  --input-line: #b9ad98;
+  --field-bg: rgba(255, 255, 255, 0.64);
+  --field-line: #d8ceb9;
+  --button-bg: rgba(255, 252, 245, 0.9);
+  --button-line: #c4b38d;
+  --button-ink: #26302a;
+  --save-top: #fffefa;
+  --save-bottom: #fff2c3;
+  --save-hover-top: #fff8d8;
+  --save-hover-bottom: #f6d64b;
+  --save-hover-line: #88785d;
+  --save-hover-ink: #000;
+  --save-hover-feedback: var(--good-text);
+  --ink-soft: #343a36;
+  --note: #535b50;
+  --note-2: #514b43;
+  --reference: #4f584f;
+  --link: #174f9f;
+  --link-hover: #0b3170;
+  --clear-hover: #1f3324;
+  --good-text: #045321;
+  --good-text-hover: #087633;
+  --good-label: #087633;
+  --fair-label: #926000;
+  --fair-accent: #a56600;
+  --bad-label: #b51d1d;
+  --row-bad: #fbe3e0;
+  --row-fair: #fff1ca;
+  --row-good: #e4efda;
+  --ready-line: #9dcaa8;
+  --ready-top: #f3faf4;
+  --stale-line: #c4502a;
+  --stale-bg: #fff3cc;
+  --stale-ink: #8d1d1d;
+  --wk-logged: #e4dcc8;
+  --wk-logged-line: #5f675f;
+  --wk-night-logged: #b9d7ee;
+  --wk-night-logged-line: #245b92;
+  --wk-night: #087633;
+  --wk-cap: #d82222;
+  --wk-label: #141817;
+  --wk-muted: #5f675f;
+  --milestone-bg: #e6f4e8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0e1213;
+    --ink: #ece6d6;
+    --muted: #a9b3a9;
+    --table-line: #3b4647;
+    --shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+    --page-top: #151b1c;
+    --page-bottom: #0e1213;
+    --surface: #1b2324;
+    --surface-solid: #1b2324;
+    --surface-soft: #1b2324;
+    --surface-table: #202a2b;
+    --surface-row: #222c2d;
+    --surface-values: #1b2324;
+    --sheet: #1a2122;
+    --sheet-grid: rgba(255, 255, 255, 0.04);
+    --head-bg: #2a3637;
+    --head-ink: #ece6d6;
+    --panel-line: #3b4647;
+    --divider: #3b4647;
+    --divider-soft: #2e3839;
+    --input-bg: #141a1b;
+    --input-line: #7d898a;
+    --field-bg: #141a1b;
+    --field-line: #7d898a;
+    --button-bg: #2b3637;
+    --button-line: #6b7778;
+    --button-ink: #ece6d6;
+    --save-top: #2f3b3c;
+    --save-bottom: #263031;
+    --save-hover-top: #6b5a10;
+    --save-hover-bottom: #8a7414;
+    --save-hover-line: #f6c318;
+    --save-hover-ink: #fff;
+    --save-hover-feedback: #fff;
+    --ink-soft: #cdd4ca;
+    --note: #b8c1b6;
+    --note-2: #c2bbaf;
+    --reference: #b0baae;
+    --link: #8ab8ff;
+    --link-hover: #bcd7ff;
+    --clear-hover: #ffffff;
+    --good-text: #7fd69a;
+    --good-text-hover: #b4efc6;
+    --good-label: #7fd69a;
+    --fair-label: #f0b84a;
+    --fair-accent: #f0b84a;
+    --bad-label: #ff8f86;
+    --row-bad: #3d2321;
+    --row-fair: #3a2f12;
+    --row-good: #1f3524;
+    --ready-line: #2f6b43;
+    --ready-top: #1d3524;
+    --stale-line: #d9743f;
+    --stale-bg: #3b2d12;
+    --stale-ink: #ffb4a8;
+    --wk-logged: #46504a;
+    --wk-logged-line: #a9b3a9;
+    --wk-night-logged: #2f4d68;
+    --wk-night-logged-line: #8fbce6;
+    --wk-night: #35b86a;
+    --wk-cap: #ff6b63;
+    --wk-label: #ece6d6;
+    --wk-muted: #a9b3a9;
+    --milestone-bg: #1f3524;
+  }
 }
 
 * {
@@ -33,7 +165,7 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
-  background: linear-gradient(180deg, #fffaf0 0%, #efe3ca 100%);
+  background: linear-gradient(180deg, var(--page-top) 0%, var(--page-bottom) 100%);
 }
 
 button,
@@ -134,15 +266,18 @@ textarea:focus-visible {
 input {
   width: 100%;
   min-height: 38px;
-  border: 1px solid #b9ad98;
+  border: 1px solid var(--input-line);
   border-radius: 4px;
   padding: 8px 10px;
   color: var(--ink);
-  background: rgba(255, 253, 247, 0.94);
+  background: var(--input-bg);
 }
 
+/* The login form sits on the road photo, so its fields stay light in both schemes. */
 .login-form input {
   border: 2px solid rgba(20, 24, 23, 0.32);
+  color: #141817;
+  color-scheme: light;
   background: rgba(255, 253, 247, 0.92);
 }
 
@@ -292,17 +427,17 @@ input {
   align-items: stretch;
   padding: 16px 22px;
   margin-bottom: 10px;
-  border: 1px solid #d6cab5;
+  border: 1px solid var(--panel-line);
   border-radius: 8px;
-  background: rgba(255, 253, 247, 0.85);
+  background: var(--surface-soft);
 }
 
 .drive-nudge {
   grid-column: 1 / -1;
   padding: 12px 14px;
-  border: 1px solid #d6cab5;
+  border: 1px solid var(--panel-line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--surface-solid);
 }
 
 .drive-nudge h2 {
@@ -320,13 +455,13 @@ input {
 }
 
 .drive-nudge--stale {
-  border-color: #c4502a;
-  background: #fff3cc;
+  border-color: var(--stale-line);
+  background: var(--stale-bg);
   box-shadow: inset 5px 0 0 var(--brake);
 }
 
 .drive-nudge--stale h2 {
-  color: #8d1d1d;
+  color: var(--stale-ink);
 }
 
 .milestone-banner {
@@ -336,10 +471,10 @@ input {
   align-items: baseline;
   gap: 4px 12px;
   padding: 12px 14px;
-  border: 2px solid var(--sign-dark);
+  border: 2px solid var(--good-label);
   border-radius: 8px;
-  background: #e6f4e8;
-  color: var(--sign-dark);
+  background: var(--milestone-bg);
+  color: var(--good-text);
   box-shadow: inset 5px 0 0 var(--line);
 }
 
@@ -374,14 +509,14 @@ input {
   padding: 8px 10px;
   border: 1px dashed var(--table-line);
   border-radius: 8px;
-  background: rgba(255, 253, 247, 0.6);
+  background: var(--surface-soft);
   color: var(--muted);
 }
 
 .milestone--reached {
-  border: 2px solid var(--sign);
-  background: #e6f4e8;
-  color: var(--sign-dark);
+  border: 2px solid var(--good-label);
+  background: var(--milestone-bg);
+  color: var(--good-text);
 }
 
 .milestone-label {
@@ -402,7 +537,7 @@ input {
   grid-column: 1 / -1;
   min-width: 0;
   padding-top: 10px;
-  border-top: 1px solid #d1c5af;
+  border-top: 1px solid var(--divider);
   font-size: 0.85rem;
   line-height: 1.4;
 }
@@ -474,7 +609,7 @@ input {
   border: 1px solid var(--table-line);
   border-collapse: collapse;
   table-layout: fixed;
-  background: rgba(255, 253, 247, 0.72);
+  background: var(--surface-values);
   font-size: 0.78rem;
   line-height: 1.3;
 }
@@ -551,28 +686,28 @@ input {
   width: 12px;
   height: 12px;
   flex: none;
-  border: 1px solid #141817;
+  border: 1px solid var(--wk-label);
   border-radius: 2px;
 }
 
 .week-swatch--credited {
-  background: #f6c318;
+  background: var(--line);
 }
 
 .week-swatch--logged {
-  background: #e4dcc8;
+  background: var(--wk-logged);
 }
 
 .week-swatch--night {
-  background: #087633;
+  background: var(--wk-night);
 }
 
 .week-swatch--night-logged {
-  background: #b9d7ee;
+  background: var(--wk-night-logged);
 }
 
 .week-swatch--capped {
-  background: #d82222;
+  background: var(--wk-cap);
   border-radius: 0;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
@@ -586,33 +721,33 @@ input {
 }
 
 .week-bar--logged {
-  fill: #e4dcc8;
-  stroke: #5f675f;
+  fill: var(--wk-logged);
+  stroke: var(--wk-logged-line);
   stroke-width: 0.6;
 }
 
 .week-bar--credited {
-  fill: #f6c318;
+  fill: var(--line);
 }
 
 .week-bar--night-logged {
-  fill: #b9d7ee;
-  stroke: #245b92;
+  fill: var(--wk-night-logged);
+  stroke: var(--wk-night-logged-line);
   stroke-width: 0.6;
 }
 
 .week-bar--night {
-  fill: #087633;
+  fill: var(--wk-night);
 }
 
 .week-cap-line {
-  stroke: #d82222;
+  stroke: var(--wk-cap);
   stroke-width: 1;
   stroke-dasharray: 3 2;
 }
 
 .week-axis {
-  stroke: #141817;
+  stroke: var(--wk-label);
   stroke-width: 1;
 }
 
@@ -623,30 +758,30 @@ input {
 }
 
 .week-label {
-  fill: #141817;
+  fill: var(--wk-label);
 }
 
 .week-month,
 .week-axis-label {
-  fill: #5f675f;
+  fill: var(--wk-muted);
 }
 
 .week-label--capped,
 .week-axis-label--cap,
 .week-flag {
-  fill: #d82222;
+  fill: var(--wk-cap);
 }
 
 .entry-note {
   margin: 4px 0;
-  color: #535b50;
+  color: var(--note);
   font-size: 0.8rem;
   line-height: 1.4;
 }
 
 .metric {
   padding: 0 26px 0 0;
-  border-right: 1px solid #d1c5af;
+  border-right: 1px solid var(--divider);
 }
 
 .metric h2,
@@ -844,7 +979,7 @@ input {
 
 .save-feedback {
   margin: 6px 0 0;
-  color: var(--sign-dark);
+  color: var(--good-text);
   font-size: 0.82rem;
   font-weight: 700;
   text-align: center;
@@ -872,10 +1007,10 @@ input {
 }
 
 .side-panel {
-  border: 1px solid #d6cab5;
+  border: 1px solid var(--panel-line);
   border-radius: 8px;
   padding: 18px;
-  background: rgba(255, 253, 247, 0.94);
+  background: var(--surface);
   box-shadow: 0 5px 12px rgba(48, 37, 21, 0.12);
 }
 
@@ -938,7 +1073,7 @@ input {
 
 .practice-note {
   margin: 2px 0 0;
-  color: #343a36;
+  color: var(--ink-soft);
   font-size: 0.86rem;
 }
 
@@ -1005,7 +1140,7 @@ input {
 
 .hold-countdown strong {
   margin-right: 2px;
-  color: var(--sign-dark);
+  color: var(--good-text);
   font-size: 2rem;
   line-height: 1.1;
 }
@@ -1025,7 +1160,7 @@ input {
   gap: 10px;
   margin: 14px 0 0;
   padding: 14px 0 0;
-  border-top: 1px solid #e3d8c3;
+  border-top: 1px solid var(--divider-soft);
   list-style: none;
 }
 
@@ -1063,16 +1198,16 @@ input {
 
 .readiness-card {
   margin: 0 0 14px;
-  border: 1px solid #d6cab5;
+  border: 1px solid var(--panel-line);
   border-radius: 8px;
   padding: 16px 18px 18px;
-  background: rgba(255, 253, 247, 0.94);
+  background: var(--surface);
   box-shadow: 0 5px 12px rgba(48, 37, 21, 0.12);
 }
 
 .readiness-card--ready {
-  border-color: #9dcaa8;
-  background: linear-gradient(180deg, #f3faf4, rgba(255, 253, 247, 0.94));
+  border-color: var(--ready-line);
+  background: linear-gradient(180deg, var(--ready-top), var(--surface));
 }
 
 .readiness-card h2 {
@@ -1095,14 +1230,14 @@ input {
 }
 
 .readiness-ready strong {
-  color: var(--sign-dark);
+  color: var(--good-text);
   font-size: 1.45rem;
   line-height: 1.1;
 }
 
 .readiness-note {
   margin: 4px 0 0;
-  color: #343a36;
+  color: var(--ink-soft);
   font-size: 0.92rem;
 }
 
@@ -1127,13 +1262,13 @@ input {
 }
 
 .readiness-card a {
-  color: var(--sign-dark);
+  color: var(--good-text);
   font-weight: 700;
   text-underline-offset: 2px;
 }
 
 .readiness-card a:hover {
-  color: var(--sign);
+  color: var(--good-text-hover);
 }
 
 #progress-form,
@@ -1148,8 +1283,8 @@ input {
   border: 12px solid var(--wood);
   border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(40, 30, 15, 0.08) 1px, transparent 1px) 0 0 / 28px 28px,
-    #fffaf0;
+    linear-gradient(180deg, var(--sheet-grid) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--sheet);
   box-shadow: var(--shadow), inset 0 0 0 3px rgba(61, 33, 12, 0.32);
 }
 
@@ -1188,7 +1323,7 @@ input {
   max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--table-line);
-  background: rgba(255, 253, 247, 0.82);
+  background: var(--surface-table);
 }
 
 .checklist-reference {
@@ -1198,7 +1333,7 @@ input {
   font-size: 0.72rem;
   font-weight: 400;
   text-align: right;
-  color: #4f584f;
+  color: var(--reference);
 }
 
 .checklist-reference span {
@@ -1206,7 +1341,7 @@ input {
 }
 
 .checklist-reference a {
-  color: #174f9f;
+  color: var(--link);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -1220,7 +1355,7 @@ input {
 }
 
 .checklist-reference a:hover {
-  color: #0b3170;
+  color: var(--link-hover);
 }
 
 .checklist-toolbar {
@@ -1233,13 +1368,13 @@ input {
 
 .checklist-toolbar button {
   min-height: 32px;
-  border: 1px solid #c4b38d;
+  border: 1px solid var(--button-line);
   border-radius: 4px;
   padding: 4px 10px;
-  color: #26302a;
+  color: var(--button-ink);
   font-size: 0.75rem;
   font-weight: 700;
-  background: rgba(255, 252, 245, 0.9);
+  background: var(--button-bg);
   box-shadow: none;
 }
 
@@ -1263,11 +1398,11 @@ input {
 }
 
 .checklist-head {
-  color: #222;
+  color: var(--head-ink);
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  background: #f6efe2;
+  background: var(--head-bg);
 }
 
 .checklist-head span,
@@ -1284,16 +1419,16 @@ input {
 }
 
 .checklist-head span:nth-child(3) {
-  color: var(--brake);
+  color: var(--bad-label);
 }
 
 .checklist-head span:nth-child(4) {
-  color: var(--sign);
+  color: var(--good-label);
 }
 
 .checklist-row {
   margin: 0;
-  background: rgba(255, 252, 245, 0.72);
+  background: var(--surface-row);
 }
 
 .row-number {
@@ -1326,11 +1461,11 @@ input {
 .status-cell input {
   width: 18px;
   min-height: 18px;
-  accent-color: var(--sign);
+  accent-color: var(--good-label);
 }
 
 .status-cell--bad input {
-  accent-color: var(--brake);
+  accent-color: var(--bad-label);
 }
 
 .date-field,
@@ -1350,11 +1485,11 @@ input {
 .notes-field input {
   min-width: 0;
   min-height: 30px;
-  border-color: #d8ceb9;
+  border-color: var(--field-line);
   border-radius: 4px;
   padding: 5px 7px;
   font-size: 0.76rem;
-  background: rgba(255, 255, 255, 0.64);
+  background: var(--field-bg);
 }
 
 .date-field input {
@@ -1388,7 +1523,7 @@ input {
 }
 
 .mastered-status-text {
-  color: var(--sign-dark);
+  color: var(--good-text);
   font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.25;
@@ -1421,7 +1556,7 @@ input {
   border-right: 1px solid var(--table-line);
   border-bottom: 1px solid var(--table-line);
   border-radius: 0;
-  color: #26302a;
+  color: var(--button-ink);
   font-size: 0.62rem;
   font-weight: 700;
   background: transparent;
@@ -1432,24 +1567,28 @@ input {
   content: "";
   position: absolute;
   inset: 6px 5px;
-  border: 1px solid #c4b38d;
+  border: 1px solid var(--button-line);
   border-radius: 4px;
-  background: linear-gradient(180deg, #fffefa, #fff2c3);
+  background: linear-gradient(180deg, var(--save-top), var(--save-bottom));
   z-index: -1;
 }
 
 .row-save:hover {
-  color: #000;
+  color: var(--save-hover-ink);
 }
 
 .row-save:hover::before {
-  border-color: #88785d;
-  background: linear-gradient(180deg, #fff8d8, #f6d64b);
+  border-color: var(--save-hover-line);
+  background: linear-gradient(180deg, var(--save-hover-top), var(--save-hover-bottom));
 }
 
 .row-save-feedback {
-  color: var(--sign-dark);
+  color: var(--good-text);
   font-size: 0.58rem;
+}
+
+.row-save:hover .row-save-feedback {
+  color: var(--save-hover-feedback);
 }
 
 /* htmx disables a form's controls while its save is in flight. */
@@ -1811,20 +1950,20 @@ input {
   }
 
   .status-cell--bad .sr-only {
-    color: var(--brake);
+    color: var(--bad-label);
   }
 
   .status-cell--fair .sr-only {
-    color: #926000;
+    color: var(--fair-label);
   }
 
   .status-cell--good .sr-only {
-    color: var(--sign);
+    color: var(--good-label);
   }
 
   .checklist-row .date-field .sr-only,
   .checklist-row .notes-field .sr-only {
-    color: #514b43;
+    color: var(--note-2);
     font-size: 0.66rem;
     font-weight: 700;
     text-transform: uppercase;
@@ -1934,28 +2073,28 @@ input {
   }
 }
 
-.skill-description { margin: 5px 0 0; font-size: 0.7rem; line-height: 1.35; color: #514b43; }
-.status-cell--fair input { accent-color: #a56600; }
-.status-cell--good input { accent-color: var(--sign); }
-.skill-row--bad { background: #fbe3e0; }
-.skill-row--fair { background: #fff1ca; }
-.skill-row--good { background: #e4efda; }
-.checklist-head span:nth-child(4) { color: #926000; }
-.checklist-head span:nth-child(5) { color: var(--sign); }
+.skill-description { margin: 5px 0 0; font-size: 0.7rem; line-height: 1.35; color: var(--note-2); }
+.status-cell--fair input { accent-color: var(--fair-accent); }
+.status-cell--good input { accent-color: var(--good-label); }
+.skill-row--bad { background: var(--row-bad); }
+.skill-row--fair { background: var(--row-fair); }
+.skill-row--good { background: var(--row-good); }
+.checklist-head span:nth-child(4) { color: var(--fair-label); }
+.checklist-head span:nth-child(5) { color: var(--good-label); }
 
 .clear-rating {
   min-height: 24px;
   margin-top: 3px;
   padding: 2px 0;
   border: 0;
-  color: #514b43;
+  color: var(--note-2);
   font-size: 0.68rem;
   font-weight: 400;
   text-decoration: underline;
   background: transparent;
   box-shadow: none;
 }
-.clear-rating:hover { color: #1f3324; background: transparent; }
+.clear-rating:hover { color: var(--clear-hover); background: transparent; }
 
 .checklist-row[hidden] {
   display: none;
