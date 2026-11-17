@@ -41,7 +41,10 @@ type dsnField struct{ key, raw string }
 // single-quoted values and backslash escapes. Spaces around "=" are allowed.
 func splitKeywordValue(dsn string) ([]dsnField, error) {
 	var fields []dsnField
-	for rest := strings.TrimSpace(dsn); rest != ""; rest = strings.TrimSpace(rest) {
+	// Trim only leading separators: trailing whitespace may be an escaped part of
+	// the last value (for example password=p\ ).
+	const separators = " \t\n"
+	for rest := strings.TrimLeft(dsn, separators); rest != ""; rest = strings.TrimLeft(rest, separators) {
 		eq := strings.IndexByte(rest, '=')
 		if eq < 0 {
 			return nil, fmt.Errorf("invalid keyword/value connection string: missing %q", "=")

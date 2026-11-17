@@ -15,6 +15,7 @@ func TestSetConnParamReplacesApplicationNameAndKeepsTheRest(t *testing.T) {
 		{"keyword/value with application_name", "host=db.example port=5433 user=u password='p ss' dbname=app sslmode=disable application_name=ci_runner connect_timeout=7"},
 		{"keyword/value spaced and quoted", "host = db.example user=u password='it\\'s' dbname=app application_name = 'ci runner'"},
 		{"keyword/value without application_name", "host=db.example user=u dbname=app"},
+		{"keyword/value escaped trailing space", "host=db user=u password=p\\ "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			before, err := pgconn.ParseConfig(tc.conn)
@@ -43,6 +44,23 @@ func TestSetConnParamReplacesApplicationNameAndKeepsTheRest(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSetConnParamPreservesEscapedTrailingSpace(t *testing.T) {
+	got, err := SetConnParam("host=db user=u password=p\\ ", "search_path", "s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := pgconn.ParseConfig(got)
+	if err != nil {
+		t.Fatalf("rewritten connection string does not parse: %v", err)
+	}
+	if cfg.Password != "p " {
+		t.Fatalf("password = %q, want %q", cfg.Password, "p ")
+	}
+	if cfg.RuntimeParams["search_path"] != "s" {
+		t.Fatalf("search_path = %q, want s", cfg.RuntimeParams["search_path"])
 	}
 }
 
