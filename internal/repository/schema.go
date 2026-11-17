@@ -8,15 +8,17 @@ import (
 )
 
 // SchemaVersion is the highest goose migration in migrations/ that this
-// binary requires. TestSchemaVersionMatchesMigrations keeps it in sync.
+// binary requires: bump it with every new migration.
+// TestSchemaVersionMatchesMigrations keeps it in sync.
 const SchemaVersion int64 = 8
 
 type rowQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// CheckSchemaVersion refuses a database whose applied goose version is older
-// than SchemaVersion, so an auto-deployed binary does not run on an
+// CheckSchemaVersion is the post-migration safety check. NewStore applies the
+// embedded migrations first, then this refuses a database whose applied goose
+// version is still older than SchemaVersion, so the binary never serves an
 // unmigrated schema.
 func CheckSchemaVersion(ctx context.Context, db rowQuerier) error {
 	var exists bool
@@ -37,7 +39,7 @@ func CheckSchemaVersion(ctx context.Context, db rowQuerier) error {
 		}
 	}
 	if version < SchemaVersion {
-		return fmt.Errorf("database schema version %d is older than required version %d; apply migrations (make migrate) before starting this release", version, SchemaVersion)
+		return fmt.Errorf("database schema version %d is older than required version %d; startup migration did not reach the required version", version, SchemaVersion)
 	}
 	return nil
 }
