@@ -18,7 +18,8 @@ import (
 
 // Apply runs any pending SQL migrations bundled with the binary. It uses the
 // same goose_db_version table as the goose CLI (`make migrate`), so versions
-// already applied by hand are never re-run.
+// already applied by hand are never re-run. The session advisory lock it takes
+// serializes app replicas only, not the goose CLI.
 func Apply(ctx context.Context, pool *pgxpool.Pool, logger *slog.Logger) error {
 	return apply(ctx, pool, migrations.Files, logger)
 }

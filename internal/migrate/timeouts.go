@@ -16,9 +16,11 @@ const StartupTimeout = 20 * time.Second
 
 // migrationTimeouts separates the overall startup deadline from lock and
 // cleanup limits. lockID selects the Postgres advisory lock; zero means Goose's
-// default ID, which production always uses so every replica (and the goose CLI
-// behind `make migrate`) contends on the same lock. Tests set a unique ID so
-// concurrently running test packages cannot hold or wait on each other's lock.
+// default ID, which production always uses so every app replica contends on the
+// same lock. That session lock serializes app replicas only: the goose CLI
+// behind `make migrate` does not take it, so running the CLI concurrently with
+// app startup is not serialized by it. Tests set a unique ID so concurrently
+// running test packages cannot hold or wait on each other's lock.
 type migrationTimeouts struct {
 	total, lock, unlock time.Duration
 	lockID              int64

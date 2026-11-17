@@ -277,8 +277,9 @@ func TestStartupBudgetsFitHealthcheckStartPeriod(t *testing.T) {
 }
 
 func TestProductionUsesGooseDefaultLockID(t *testing.T) {
-	// Every replica, and the goose CLI behind `make migrate`, must contend on
-	// one lock. Only tests override the ID.
+	// Every app replica must contend on one lock. This does not cover the goose
+	// CLI behind `make migrate`, which does not take the session lock. Only
+	// tests override the ID.
 	if got := startupTimeouts.sessionLockID(); got != lock.DefaultLockID {
 		t.Fatalf("production lock ID = %d, want goose default %d", got, lock.DefaultLockID)
 	}

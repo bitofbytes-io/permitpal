@@ -107,7 +107,7 @@ After migrating, PermitPal still checks `goose_db_version` and exits if the appl
 
 CI deploys new images automatically on pushes to `main`, and Swarm starts new replicas before stopping old ones. The previous release therefore keeps running on the migrated schema for a while, so every migration must stay backward compatible with it: add columns, tables and constraints that old code never violates, and do not drop or rename anything the previous release uses. Migrations 004 to 008 are additive in this sense, and 006 only removes the unused seed.
 
-The goose CLI still works and shares the same `goose_db_version` table, so a migration applied by hand first (for example `make migrate`) is simply skipped at startup. To run migrations without starting PermitPal against a local database:
+The goose CLI still works and shares the same `goose_db_version` table, so a migration applied by hand first (for example `make migrate`) is simply skipped at startup. The startup advisory lock serializes app replicas only; the goose CLI does not take it, so do not run `make migrate` while an app instance is starting against the same database. To run migrations without starting PermitPal against a local database:
 
 ```bash
 go install github.com/pressly/goose/v3/cmd/goose@latest
