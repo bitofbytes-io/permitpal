@@ -23,7 +23,7 @@ linters:
           - gosec
       # The server test helpers (doGet, doPostForm) return responses that
       # readBody or closeBody close; bodyclose cannot follow that through them.
-      - path: _test\.go
+      - path: internal/server/.*_test\.go
         linters:
           - bodyclose
 formatters:
