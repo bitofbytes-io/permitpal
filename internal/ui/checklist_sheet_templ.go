@@ -12,7 +12,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/drywaters/permitpal/internal/model"
 
 // ChecklistSheet is the clipboard of road-test skills with its order toggle.
-// Rows live in checklist.templ and the toggle script in dashboard_scripts.templ.
+// Rows live in checklist.templ and the toggle script in static/dashboard.js.
 func ChecklistSheet(dashboard model.Dashboard) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

@@ -40,6 +40,8 @@ jobs:
           cache-dependency-path: go.sum
       - name: Check generated templ output
         run: make check-generated
+      - name: Check static JavaScript syntax
+        run: make check-js
       - name: Check Go formatting and static analysis
         run: make lint
       - run: make test
