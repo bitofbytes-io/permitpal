@@ -177,13 +177,12 @@ Migration 003 can be reversed on a scratch database with `make migrate-down` the
 make check-generated
 make lint
 PERMITPAL_TEST_DATABASE_URL='postgres://user:password@localhost/permitpal_test?sslmode=disable' make test
-go vet ./...
 make build
 ```
 
 `make test` runs the whole suite once with the race detector, so it needs cgo and a C compiler. Set `PERMITPAL_TEST_DATABASE_URL` to a disposable database to include the Postgres tests; without it they are skipped.
 
-`make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs golangci-lint with the checks in `.golangci.yml` (staticcheck, errcheck, gosec, govet, gofmt). golangci-lint runs through `go run` at the version pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, so no global installation is needed and Renovate tracks that pin. Suppress a finding only with a `//nolint:gosec // reason` comment that explains why it is safe. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
+`make lint` regenerates templ output, checks all Go files (including generated files) with `gofmt` without rewriting them, and runs golangci-lint with the checks in `.golangci.yml` (staticcheck, errcheck, gosec, govet, errorlint, bodyclose, ineffassign, unused, gofmt), which is the single `go vet` path in CI. golangci-lint runs through `go run` at the version pinned as `GOLANGCI_LINT_VERSION` in the `Makefile`, so no global installation is needed and Renovate tracks that pin. Suppress a finding only with a `//nolint:gosec // reason` comment that explains why it is safe. Fix formatting in source files with `gofmt -w`; edit `.templ` sources and run `make templ` for generated output.
 
 CI also runs the dashboard feedback browser test in Chromium against both memory and Postgres stores, and a colour scheme test that emulates light and dark and checks the rendered colours of key components. To run the same tests locally with Node 24, set `PERMITPAL_TEST_DATABASE_URL` to a disposable database, then run from the repository root:
 

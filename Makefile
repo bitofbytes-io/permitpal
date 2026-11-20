@@ -36,7 +36,7 @@ check-generated: templ ## Verify committed templ output is up to date
 		exit 1; \
 	fi
 
-lint: templ ## Check Go formatting and run golangci-lint (staticcheck, errcheck, gosec, govet)
+lint: templ ## Check Go formatting and run golangci-lint (staticcheck, errcheck, gosec, govet, errorlint, bodyclose, ineffassign, unused)
 	@unformatted="$$(gofmt -l .)" || exit 1; \
 	if [ -n "$$unformatted" ]; then \
 		echo "Go files need formatting. Run gofmt -w on the listed files:" >&2; \

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -187,7 +188,7 @@ func TestUnusedSeedIsRemovedFromNewInstalls(t *testing.T) {
 	t.Run("new install", func(t *testing.T) {
 		pool := install(t, 0, 0)
 		migrate(t, pool, 6, 6)
-		if _, err := calebTracker(t, pool); err != ErrNotFound {
+		if _, err := calebTracker(t, pool); !errors.Is(err, ErrNotFound) {
 			t.Fatalf("seeded caleb driver still present: %v", err)
 		}
 		var rows int
