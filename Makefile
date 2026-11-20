@@ -39,7 +39,7 @@ check-generated: templ ## Verify committed templ output is up to date
 check-js: ## Syntax-check the hand-written static JavaScript with node --check
 	@for f in static/*.js; do node --check "$$f" || exit 1; done
 
-lint: templ ## Check Go formatting and run golangci-lint (staticcheck, errcheck, gosec, govet)
+lint: templ ## Check Go formatting and run golangci-lint (staticcheck, errcheck, gosec, govet, errorlint, bodyclose, ineffassign, unused)
 	@unformatted="$$(gofmt -l .)" || exit 1; \
 	if [ -n "$$unformatted" ]; then \
 		echo "Go files need formatting. Run gofmt -w on the listed files:" >&2; \

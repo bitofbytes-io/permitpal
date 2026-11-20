@@ -160,7 +160,8 @@ func TestStartServesMetricsAndShutsDown(t *testing.T) {
 	if err := srv.Shutdown(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.Get("http://" + srv.Addr().String() + "/metrics"); err == nil {
+	if res, err := client.Get("http://" + srv.Addr().String() + "/metrics"); err == nil {
+		_ = res.Body.Close()
 		t.Fatal("metrics listener still serving after Shutdown")
 	}
 }

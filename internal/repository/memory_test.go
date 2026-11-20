@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -66,7 +67,7 @@ func TestMemoryDriversAreIsolatedAndIdempotent(t *testing.T) {
 	if next.Profile.TotalHours != 12 || next.Requirements[0].Notes != "Practice" {
 		t.Fatal("login reset saved data")
 	}
-	if _, err := store.DriverByUsername(ctx, "missing"); err != ErrNotFound {
+	if _, err := store.DriverByUsername(ctx, "missing"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("missing driver: %v", err)
 	}
 }
