@@ -5,12 +5,13 @@ import "github.com/drywaters/permitpal/internal/model"
 // DashboardPage is the signed-in page. Each section lives in its own file:
 // hours.templ, readiness.templ, practice.templ, whatsleft.templ,
 // progress_form.templ, checklist_sheet.templ and checklist.templ, with the page
-// scripts in dashboard_scripts.templ.
+// script in static/dashboard.js.
 templ DashboardPage(dashboard model.Dashboard) {
 	<!doctype html>
 	<html lang="en">
 		@pageHead("PermitPal Dashboard") {
 			<script src="/static/htmx.min.js" defer></script>
+			<script src="/static/dashboard.js" defer></script>
 		}
 		<body>
 			<header class="dash-header">
@@ -49,8 +50,6 @@ templ DashboardPage(dashboard model.Dashboard) {
 					</footer>
 				</main>
 			</div>
-			@SaveFeedbackScript()
-			@ChecklistViewScript()
 		</body>
 	</html>
 }

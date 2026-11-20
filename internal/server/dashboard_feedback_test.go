@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
@@ -174,6 +175,29 @@ func TestDashboardScriptsCarryTheCSPNonce(t *testing.T) {
 	}
 	if inline == 0 {
 		t.Fatal("dashboard rendered no inline scripts to check")
+	}
+	if !strings.Contains(body, `<script src="/static/dashboard.js" defer></script>`) {
+		t.Fatalf("dashboard does not load /static/dashboard.js with defer: %s", body)
+	}
+	if strings.Contains(body, "htmx:confirm") {
+		t.Fatal("dashboard still inlines its save-queue script")
+	}
+}
+
+func TestDashboardScriptIsServedAsJavaScript(t *testing.T) {
+	t.Chdir("../..")
+	ts := newTestServer(t)
+	defer ts.Close()
+	res := doGet(t, http.DefaultClient, ts.URL+"/static/dashboard.js")
+	body := readBody(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", res.StatusCode)
+	}
+	if ct := res.Header.Get("Content-Type"); !strings.Contains(ct, "javascript") {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+	if !strings.Contains(body, "htmx:confirm") || !strings.Contains(body, "data-checklist-view") {
+		t.Fatal("dashboard.js is missing the save-queue or checklist-view code")
 	}
 }
 
