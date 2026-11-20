@@ -44,6 +44,10 @@ func TestProfileValidation(t *testing.T) {
 		}
 		t.Run("today-and-equal-hours-are-allowed", func(t *testing.T) {
 			f.requireOK(t, "/profile", profileForm("4", "4", "2026-05-01"))
+			profile := f.load(t).Profile
+			if model.DateValue(profile.PermitIssueDate) != "2026-05-01" || profile.TotalHours != 4 || profile.NightHours != 4 {
+				t.Fatalf("boundary profile was not saved: %+v", profile)
+			}
 		})
 		for _, date := range []string{"2026-01-15", "", "  "} {
 			t.Run("valid-or-cleared-date/"+date, func(t *testing.T) {

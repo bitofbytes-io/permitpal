@@ -46,6 +46,10 @@ func TestRequirementValidation(t *testing.T) {
 		})
 		t.Run("today-is-allowed", func(t *testing.T) {
 			f.requireOK(t, quickStop, url.Values{"rating": {"good"}, "rated_on": {"2026-05-01"}})
+			requirement, ok := model.RequirementByKey(f.load(t).Requirements, "quick-stop")
+			if !ok || requirement.Rating != model.RatingGood || model.DateValue(requirement.RatedOn) != "2026-05-01" {
+				t.Fatalf("today's rating was not saved: %+v", requirement)
+			}
 		})
 		for _, date := range []string{"2026-01-15", "", "  "} {
 			t.Run("valid-or-cleared-date/"+date, func(t *testing.T) {
@@ -122,7 +126,8 @@ func trackerFor(t *testing.T, store repository.Store, driver model.Driver) model
 
 func TestClearRatingPreservesNotesAndUpdatesFocus(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, backend string) {
-		f := newFormFixture(t, backend, time.Now())
+		// Pin "now" after the submitted rated_on date.
+		f := newFormFixture(t, backend, time.Date(2026, 5, 2, 0, 0, 0, 0, time.Local))
 		form := url.Values{"rating": {"good"}, "rated_on": {"2026-05-01"}, "notes": {"Keep this practice note"}}
 		f.requireOK(t, quickStop, form)
 		form.Set("clear_rating", "true")
