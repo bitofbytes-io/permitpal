@@ -19,7 +19,7 @@ PLATFORMS ?= linux/amd64,linux/arm64/v8
 # renovate: datasource=github-releases depName=golangci/golangci-lint
 GOLANGCI_LINT_VERSION := v2.15.0
 
-.PHONY: help templ check-generated lint dev run run-postgres build test migrate migrate-down migrate-status docker-build docker-buildx clean
+.PHONY: help templ check-generated check-js lint dev run run-postgres build test migrate migrate-down migrate-status docker-build docker-buildx clean
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make <target>\n\nTargets:\n"} /^[a-zA-Z0-9_.-]+:.*##/ {printf "  %-20s %s\n", $$1, $$2} END {printf "\n"}' $(MAKEFILE_LIST)
@@ -35,6 +35,9 @@ check-generated: templ ## Verify committed templ output is up to date
 		printf '%s\n' "$$untracked" >&2; \
 		exit 1; \
 	fi
+
+check-js: ## Syntax-check the hand-written static JavaScript with node --check
+	@for f in static/*.js; do node --check "$$f" || exit 1; done
 
 lint: templ ## Check Go formatting and run golangci-lint (staticcheck, errcheck, gosec, govet)
 	@unformatted="$$(gofmt -l .)" || exit 1; \
