@@ -13,7 +13,10 @@ func saveHours(profile Profile, total, night float64, at time.Time) Profile {
 }
 
 func TestEntryDatesUseLocalISOWeeksAndSurviveTimezoneChanges(t *testing.T) {
-	loc, _ := time.LoadLocation("America/New_York")
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Fatal(err)
+	}
 	sunday := time.Date(2027, 1, 3, 23, 30, 0, 0, loc) // January 4 in UTC, ISO 2026-W53 locally.
 	p := saveHours(Profile{}, 15, 1, sunday)
 	p = saveHours(p, 25, 2, sunday.Add(time.Hour))
