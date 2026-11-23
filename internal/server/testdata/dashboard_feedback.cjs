@@ -510,7 +510,7 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     // above; the other skills are still in practice.
     const view = (name) => page.locator("[data-checklist-view=" + name + "]");
     const shownSkills = () =>
-      page.locator(".checklist-row").evaluateAll((rows) => rows.filter((el) => el.getClientRects().length > 0).map((el) => el.id.replace("requirement-", "")));
+      page.locator(".checklist-row:visible").evaluateAll((rows) => rows.map((el) => el.id.replace("requirement-", "")));
     const emptyNote = page.locator("#checklist-empty");
     const sheetOrder = ["quick-stop", "turn-about", "stop-on-grade", "start-on-grade", "backing", "approach-corner", "right-turns", "left-turns", "traffic-lights", "use-of-controls", "starts", "use-of-lane", "use-of-brake", "following", "attention", "stop-signs", "parking"];
     assert.deepEqual(await shownSkills(), sheetOrder);
