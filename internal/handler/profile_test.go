@@ -60,13 +60,16 @@ func TestUpdateProfileReturnsProgressSavedFeedback(t *testing.T) {
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/profile", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
-	store := repository.NewMemoryStore(time.Now())
-	driver, err := store.EnsureDriver(context.Background(), "aiden", time.Now())
+	// Pin the clock after the submitted permit issue date.
+	at := time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC)
+	store := repository.NewMemoryStore(at)
+	driver, err := store.EnsureDriver(context.Background(), "aiden", at)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req = req.WithContext(middleware.WithDriver(req.Context(), driver))
-	handler := NewDashboardHandler(store, time.Local)
+	handler := NewDashboardHandler(store, time.UTC)
+	handler.now = func() time.Time { return at }
 
 	handler.UpdateProfile(rec, req)
 
