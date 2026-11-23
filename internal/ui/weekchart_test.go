@@ -266,7 +266,14 @@ func TestDrawWeekChartColumns(t *testing.T) {
 func TestDrawWeekChartCapFlagAndBarPlacement(t *testing.T) {
 	// One capped week: the slot is 318 wide, so the group origin is 184 and the center 193.
 	week := cappedWeek(monday(time.August, 3))
-	column := drawWeekChart(model.WeekCreditChart{Weeks: []model.WeekCreditBar{week}}).Columns[0]
+	got := drawWeekChart(model.WeekCreditChart{Weeks: []model.WeekCreditBar{week}})
+	if len(got.Columns) != 1 {
+		t.Fatalf("got %d columns, want 1", len(got.Columns))
+	}
+	column := got.Columns[0]
+	if len(column.Bars) != 4 {
+		t.Fatalf("got %d bars, want 4", len(column.Bars))
+	}
 	// The logged bar reaches the plot top (16), so the flag sits 8 units above it.
 	if want := "193.0,8.0 189.0,14.0 197.0,14.0"; column.Flag != want {
 		t.Errorf("Flag = %q, want %q", column.Flag, want)
