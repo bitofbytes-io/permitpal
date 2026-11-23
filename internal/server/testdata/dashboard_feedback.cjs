@@ -506,6 +506,53 @@ const statuses = (scope) => scope.getByRole("status").allInnerTexts();
     await page.waitForFunction(() => window.htmx);
     assert.deepEqual(await hours(), ["6.0", "2.0"]);
 
+    // The checklist view toggle. Quick stop is mastered from the skill save
+    // above; the other skills are still in practice.
+    const view = (name) => page.locator("[data-checklist-view=" + name + "]");
+    const shownSkills = () =>
+      page.locator(".checklist-row").evaluateAll((rows) => rows.filter((el) => !el.hidden).map((el) => el.id.replace("requirement-", "")));
+    const emptyNote = page.locator("#checklist-empty");
+    const sheetOrder = ["quick-stop", "turn-about", "stop-on-grade", "start-on-grade", "backing", "approach-corner", "right-turns", "left-turns", "traffic-lights", "use-of-controls", "starts", "use-of-lane", "use-of-brake", "following", "attention", "stop-signs", "parking"];
+    assert.deepEqual(await shownSkills(), sheetOrder);
+    assert.equal(await view("sheet").getAttribute("aria-pressed"), "true");
+    assert.equal(await view("recent").getAttribute("aria-pressed"), "false");
+
+    await view("recent").click();
+    assert.deepEqual(await shownSkills(), ["quick-stop"], "Recently mastered showed a skill still in practice");
+    assert.equal(await view("recent").getAttribute("aria-pressed"), "true");
+    assert.equal(await view("sheet").getAttribute("aria-pressed"), "false");
+    assert.equal(await emptyNote.isHidden(), true);
+
+    // Skills still in practice are hidden in this view, so master two more
+    // from the full sheet. Newest sign-off comes first, and skills signed off
+    // on the same date keep their sheet order.
+    const master = async (key, title, date) => {
+      const form = page.locator("#requirement-" + key);
+      await form.locator("input[value=good]").check();
+      await form.locator("[name=rated_on]").fill(date);
+      await update(form, title);
+      assert.deepEqual(await statuses(form), ["Saved"]);
+    };
+    await view("sheet").click();
+    await master("backing", "Backing", "2025-08-01");
+    await master("following", "Following", "2025-06-01");
+    assert.deepEqual(await shownSkills(), sheetOrder);
+    await view("recent").click();
+    assert.deepEqual(await shownSkills(), ["backing", "quick-stop", "following"]);
+
+    // A save made while the view is on re-sorts it without resetting it.
+    const quickStop = page.locator("#requirement-quick-stop");
+    await quickStop.locator("[name=rated_on]").fill("2025-09-01");
+    await update(quickStop, "Quick stop");
+    assert.deepEqual(await shownSkills(), ["quick-stop", "backing", "following"]);
+    assert.equal(await view("recent").getAttribute("aria-pressed"), "true", "a save reset the checklist view");
+
+    await view("sheet").click();
+    assert.deepEqual(await shownSkills(), sheetOrder);
+    assert.equal(await view("sheet").getAttribute("aria-pressed"), "true");
+    assert.equal(await view("recent").getAttribute("aria-pressed"), "false");
+    assert.deepEqual(await page.locator(".checklist-row").evaluateAll((rows) => rows.map((el) => el.id.replace("requirement-", ""))), sheetOrder, "All skills did not restore the sheet order");
+
     assert.deepEqual(problems, []);
   } finally {
     await browser.close();
